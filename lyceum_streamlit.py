@@ -222,7 +222,7 @@ with st.sidebar:
         for i, item in enumerate(st.session_state.drill_queue):
             col1, col2, col3 = st.columns([3, 1, 1])
             with col1:
-                st.caption(f"{item['speaker']}: "{item['text'][:60]}…"")
+                st.caption(item['speaker'] + ': "' + item['text'][:60] + '..."')
             with col2:
                 if st.button("↓ Send", key=f"send_{i}"):
                     st.session_state.query_box = item['text']
