@@ -265,14 +265,8 @@ if st.session_state.llm:
                         prior_turn_index = idx
                         break
 
-    # Poll all specialists checkbox — only shown when addressing Jackie
-    poll_all = False
-    if recipient == "Orchestrator":
-        poll_all = st.checkbox(
-            "Ask all specialists to respond in turn",
-            value=False,
-            help="Jackie will post your message, then each specialist will respond directly in sequence."
-        )
+    # Orchestrator always triggers all specialists in sequence
+    poll_all = (recipient == "Orchestrator")
 
     # --- PDF uploader ---
     uploaded_pdf = st.file_uploader(
@@ -318,7 +312,7 @@ if st.session_state.llm:
                 "Predictive Cognitivist": "predictive",
             }
 
-            if recipient == "Orchestrator" and poll_all:
+            if recipient == "Orchestrator":
                 # Jackie posts first, then each specialist responds in turn
                 with st.spinner("Orchestrator is opening the floor…"):
                     jackie_text = call_agent('orchestrator', full_query)
