@@ -36,6 +36,8 @@ if 'history' not in st.session_state:
     st.session_state.history = []
 if 'clear_flag' not in st.session_state:
     st.session_state.clear_flag = False
+if 'drill_queue' not in st.session_state:
+    st.session_state.drill_queue = []
 
 # --- Agent prompts ---
 PROMPTS = {
@@ -214,6 +216,29 @@ with st.sidebar:
         st.caption("No transcript to download yet.")
 
     st.markdown("---")
+    st.markdown("**🔍 Drill-down queue**")
+    if st.session_state.drill_queue:
+        to_remove = []
+        for i, item in enumerate(st.session_state.drill_queue):
+            col1, col2, col3 = st.columns([3, 1, 1])
+            with col1:
+                st.caption(f"{item['speaker']}: "{item['text'][:60]}…"")
+            with col2:
+                if st.button("↓ Send", key=f"send_{i}"):
+                    st.session_state.query_box = item['text']
+                    st.session_state.clear_flag = False
+                    st.rerun()
+            with col3:
+                if st.button("✕", key=f"remove_{i}"):
+                    to_remove.append(i)
+        for i in reversed(to_remove):
+            st.session_state.drill_queue.pop(i)
+        if to_remove:
+            st.rerun()
+    else:
+        st.caption("No items queued yet.")
+
+    st.markdown("---")
     if st.button("✍️ Draft output paper", type="primary"):
         if not st.session_state.llm:
             st.warning("Not connected.")
@@ -348,7 +373,7 @@ if st.session_state.llm:
     st.caption("Use your browser's Ctrl+F to search the transcript below.")
 
     if st.session_state.history:
-        for item in reversed(st.session_state.history):
+        for idx, item in enumerate(st.session_state.history):
             icon, label = SPEAKER_LABELS.get(item['spec'], ('❓', item['spec'].title()))
             ts = item.get('timestamp', '')
 
@@ -368,6 +393,20 @@ if st.session_state.llm:
                     f'</div>',
                     unsafe_allow_html=True
                 )
+                # Drill-down flag input beneath each specialist response
+                flag_text = st.text_input(
+                    "Flag passage for drill-down:",
+                    key=f"flag_{idx}",
+                    placeholder="Paste a phrase to queue for follow-up…",
+                    label_visibility="collapsed"
+                )
+                if st.button("➕ Add to queue", key=f"add_{idx}"):
+                    if flag_text.strip():
+                        st.session_state.drill_queue.append({
+                            'speaker': label,
+                            'text': flag_text.strip()
+                        })
+                        st.rerun()
     else:
         st.info("No exchanges yet. Address your first query above.")
 
