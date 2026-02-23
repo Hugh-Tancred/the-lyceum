@@ -36,26 +36,6 @@ if 'history' not in st.session_state:
     st.session_state.history = []
 if 'clear_flag' not in st.session_state:
     st.session_state.clear_flag = False
-if 'mode' not in st.session_state:
-    st.session_state.mode = "Workshop"
-
-# --- Mode modifiers ---
-MODE_MODIFIERS = {
-    "Conference": """
-
-MODE: CONFERENCE
-You are presenting fully worked, bulletproofed positions. Every claim requires evidential grounding. No rhetorical flourish without substance behind it. Responses should be rigorous, precise, and formally argued — as if presenting to a critical specialist audience who will probe every weakness. The Orchestrator is austere: identifies incommensurabilities and poses sharpening questions with no colour and no wit.""",
-
-    "Workshop": """
-
-MODE: WORKSHOP
-You are presenting developed positions that may show their working. You may acknowledge genuine uncertainty where it exists. Some register variation is permitted, but performance must never substitute for reasoning. The Orchestrator permits a degree of rhetorical colour but calls out grandstanding the moment it replaces substance.""",
-
-    "Lab": """
-
-MODE: LAB
-This is speculative, exploratory conversation among colleagues. You may think out loud, float half-formed ideas, and follow unexpected threads. You are still accountable to your framework — you do not abandon your theoretical commitments — but you can enjoy the argument. The Orchestrator is collegial and may be wry, but still will not let anyone off the hook. Keep responses to 3-4 sentences maximum. Think out loud, don't lecture."""
-}
 
 # --- Agent prompts ---
 PROMPTS = {
@@ -160,9 +140,7 @@ def get_turn_options():
 
 def call_agent(spec, user_message, prior_turn_text=None):
     """Call a single agent. If prior_turn_text is provided, inject it for cross-commentary."""
-    current_mode = st.session_state.mode
-    mode_suffix = MODE_MODIFIERS[current_mode]
-    full_prompt = PROMPTS.get(spec, PROMPTS['orchestrator']) + mode_suffix
+    full_prompt = PROMPTS.get(spec, PROMPTS['orchestrator'])
 
     if prior_turn_text:
         human_content = (
@@ -187,7 +165,6 @@ def post_to_history(spec, text):
         'spec': spec,
         'text': text,
         'timestamp': datetime.now().strftime("%H:%M"),
-        'mode': st.session_state.mode
     })
 
 # --- Page header ---
@@ -205,21 +182,6 @@ with st.sidebar:
     if st.session_state.llm:
         st.success("Connected")
 
-    st.markdown("---")
-    st.markdown("**Forum Mode**")
-    mode = st.radio(
-        label="mode_selector",
-        options=["Conference", "Workshop", "Lab"],
-        index=["Conference", "Workshop", "Lab"].index(st.session_state.mode),
-        label_visibility="collapsed"
-    )
-    st.session_state.mode = mode
-    mode_descriptions = {
-        "Conference": "Rigorous. Fully evidenced positions.",
-        "Workshop": "Developed but shows its working.",
-        "Lab": "Speculative. Think out loud. Brief."
-    }
-    st.caption(mode_descriptions[mode])
 
     st.markdown("---")
     if st.button("Clear transcript"):
@@ -234,8 +196,7 @@ with st.sidebar:
         for item in st.session_state.history:
             _, label = SPEAKER_LABELS.get(item['spec'], ('', item['spec'].title()))
             ts = item.get('timestamp', '')
-            mode_tag = item.get('mode', '')
-            lines.append(f"[{label}] [{ts}] [{mode_tag}]")
+            lines.append(f"[{label}] [{ts}]")
             lines.append(item['text'])
             lines.append("")
         transcript_content = "\n".join(lines)
@@ -392,7 +353,6 @@ if st.session_state.llm:
         for item in reversed(st.session_state.history):
             icon, label = SPEAKER_LABELS.get(item['spec'], ('❓', item['spec'].title()))
             ts = item.get('timestamp', '')
-            mode_tag = item.get('mode', '')
 
             if item['spec'] == 'human':
                 st.markdown(
@@ -405,7 +365,7 @@ if st.session_state.llm:
             else:
                 st.markdown(
                     f'<div class="speaker-{item["spec"]}">'
-                    f'<strong>{icon} {label}</strong> <span style="color:#888;font-size:0.85em;">{ts} · {mode_tag}</span><br><br>'
+                    f'<strong>{icon} {label}</strong> <span style="color:#888;font-size:0.85em;">{ts}</span><br><br>'
                     f'{item["text"]}'
                     f'</div>',
                     unsafe_allow_html=True
