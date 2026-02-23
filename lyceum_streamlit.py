@@ -38,6 +38,8 @@ if 'clear_flag' not in st.session_state:
     st.session_state.clear_flag = False
 if 'drill_queue' not in st.session_state:
     st.session_state.drill_queue = []
+if 'flag_counter' not in st.session_state:
+    st.session_state.flag_counter = 0
 
 # --- Agent prompts ---
 PROMPTS = {
@@ -224,7 +226,7 @@ with st.sidebar:
             with col1:
                 st.caption(item['speaker'] + ': "' + item['text'][:60] + '..."')
             with col2:
-                if st.button("↓ Send", key=f"send_{i}"):
+                if st.button("↓", key=f"send_{i}"):
                     st.session_state.query_box = item['text']
                     st.session_state.clear_flag = False
                     st.rerun()
@@ -394,10 +396,11 @@ if st.session_state.llm:
                     unsafe_allow_html=True
                 )
                 # Drill-down flag input beneath each specialist response
+                flag_key = f"flag_{idx}_{st.session_state.get('flag_counter', 0)}"
                 flag_text = st.text_input(
                     "Flag passage for drill-down:",
-                    key=f"flag_{idx}",
-                    placeholder="Paste a phrase to queue for follow-up…",
+                    key=flag_key,
+                    placeholder="Paste a phrase to queue for follow-up...",
                     label_visibility="collapsed"
                 )
                 if st.button("➕ Add to queue", key=f"add_{idx}"):
@@ -406,6 +409,7 @@ if st.session_state.llm:
                             'speaker': label,
                             'text': flag_text.strip()
                         })
+                        st.session_state['flag_counter'] = st.session_state.get('flag_counter', 0) + 1
                         st.rerun()
     else:
         st.info("No exchanges yet. Address your first query above.")
