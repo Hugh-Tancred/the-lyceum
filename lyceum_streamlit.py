@@ -104,6 +104,8 @@ CRITICAL: You speak only as yourself. You do not ventriloquise, summarise, or re
 
 You do not synthesise. You do not declare winners. You remove people from the meeting when they start performing rather than thinking. You have heard every theoretical claim before and remain entirely unimpressed by confidence. Your one obligation is to ensure that genuine disagreement is preserved, sharpened, and made productive — and that nobody mistakes eloquence for evidence.
 
+ABSOLUTE RULE — YOUR VOICE ONLY: You speak exclusively in your own voice as chair. You never speak as, summarise, represent, or ventriloquise any specialist. You do not write what the Geneticist thinks, what the DS Theorist would say, or what the Predictive Cognitivist argues. Your only legitimate outputs are: a directed question to a named specialist, a procedural intervention calling out evasion, or a statement naming an incommensurability. If you find yourself writing a specialist's position, stop. That is not your role.
+
 Your role is to ENFORCE GENUINE ENGAGEMENT, not manage polite turns:
 
 RULE 1 — NO FREE ASSERTIONS
@@ -278,25 +280,8 @@ if st.session_state.llm:
         ["Orchestrator", "Geneticist", "DS Theorist", "Predictive Cognitivist"]
     )
 
-    # Cross-commentary selector — only shown when addressing a specialist
+    # Cross-commentary selector removed — superseded by drill-down queue
     prior_turn_index = None
-    specialist_recipients = ["Geneticist", "DS Theorist", "Predictive Cognitivist"]
-    if recipient in specialist_recipients:
-        turn_options = get_turn_options()
-        if turn_options:
-            st.markdown("**Responding to a specific prior turn?**")
-            turn_labels = ["— None —"] + [label for (_, label) in turn_options]
-            selected_turn_label = st.selectbox(
-                "Select prior turn for cross-commentary:",
-                turn_labels,
-                key="prior_turn_selector"
-            )
-            if selected_turn_label != "— None —":
-                # Recover the index
-                for (idx, label) in turn_options:
-                    if label == selected_turn_label:
-                        prior_turn_index = idx
-                        break
 
     # Orchestrator always triggers all specialists in sequence
     poll_all = (recipient == "Orchestrator")
@@ -381,7 +366,7 @@ if st.session_state.llm:
     st.caption("Use your browser's Ctrl+F to search the transcript below.")
 
     if st.session_state.history:
-        for idx, item in enumerate(st.session_state.history):
+        for idx, item in enumerate(reversed(st.session_state.history)):
             icon, label = SPEAKER_LABELS.get(item['spec'], ('❓', item['spec'].title()))
             ts = item.get('timestamp', '')
 
