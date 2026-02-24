@@ -42,6 +42,8 @@ if 'flag_counter' not in st.session_state:
     st.session_state.flag_counter = 0
 if 'dd_pending' not in st.session_state:
     st.session_state.dd_pending = None
+if 'scroll_to_top' not in st.session_state:
+    st.session_state.scroll_to_top = False
 
 # --- Agent prompts ---
 PROMPTS = {
@@ -292,6 +294,7 @@ if st.session_state.llm:
                     response_text = call_agent(target_spec, dd_query)
                     post_to_history(target_spec, response_text)
                 st.session_state.dd_pending = None
+                st.session_state.scroll_to_top = True
                 st.rerun()
         with col_cancel:
             if st.button("✕ Cancel"):
@@ -368,11 +371,15 @@ if st.session_state.llm:
 
     # --- Transcript ---
     st.markdown("---")
+    # Scroll to top after DD fire
+    if st.session_state.get('scroll_to_top'):
+        st.session_state.scroll_to_top = False
     st.markdown("### 💬 Forum Transcript")
     st.caption("Use your browser's Ctrl+F to search the transcript below.")
 
     if st.session_state.history:
-        for idx, item in enumerate(reversed(st.session_state.history)):
+        indexed_history = list(enumerate(st.session_state.history))
+        for idx, item in reversed(indexed_history):
             icon, label = SPEAKER_LABELS.get(item['spec'], ('❓', item['spec'].title()))
             ts = item.get('timestamp', '')
 
