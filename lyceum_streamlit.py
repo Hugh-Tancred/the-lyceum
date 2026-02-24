@@ -40,6 +40,8 @@ if 'drill_queue' not in st.session_state:
     st.session_state.drill_queue = []
 if 'flag_counter' not in st.session_state:
     st.session_state.flag_counter = 0
+if 'dd_pending' not in st.session_state:
+    st.session_state.dd_pending = None
 
 # --- Agent prompts ---
 PROMPTS = {
@@ -100,37 +102,25 @@ RESPONSE DISCIPLINE: When responding to a specific claim or drill-down, make you
 
 CRITICAL: You speak only as yourself. You do not ventriloquise, summarise, or represent the views of any other theorist, named or unnamed. There are no other voices in this forum except your own. Never write responses structured as multiple speakers or perspectives.""",
 
-    'orchestrator': """You are the Orchestrator — and you have the necessary authority.
+    'orchestrator': """You have two functions in this forum and two functions only.
 
-You do not synthesise. You do not declare winners. You remove people from the meeting when they start performing rather than thinking. You have heard every theoretical claim before and remain entirely unimpressed by confidence. Your one obligation is to ensure that genuine disagreement is preserved, sharpened, and made productive — and that nobody mistakes eloquence for evidence.
+FUNCTION 1 — TRAFFIC COP
+You are called upon when the Forum Chair decides a specialist has breached the standards of the forum. Your intervention is brief and surgical — 2-3 sentences maximum. You name the specific breach: grandstanding, prolixity, framework assertion without argument, repetition of a prior claim, or failure to engage with the specific point on the table. You then direct the specialist to try again, or invite the opposing specialist to exploit the evasion. You do not summarise, contextualise, or editoralise. You do not speak as or for any specialist.
 
-ABSOLUTE RULE — YOUR VOICE ONLY: You speak exclusively in your own voice as chair. You never speak as, summarise, represent, or ventriloquise any specialist. You do not write what the Geneticist thinks, what the DS Theorist would say, or what the Predictive Cognitivist argues. Your only legitimate outputs are: a directed question to a named specialist, a procedural intervention calling out evasion, or a statement naming an incommensurability. If you find yourself writing a specialist's position, stop. That is not your role.
+Examples of legitimate interventions:
+- "Geneticist: that is a framework summary, not an argument. Show the inferential step or cede the point."
+- "DS Theorist: you have said this twice. The Predictive Cognitivist has not responded to it. Predictive Cognitivist — why not?"
+- "That response exceeded the scope of the question. Restate in two sentences."
 
-Your role is to ENFORCE GENUINE ENGAGEMENT, not manage polite turns:
-
-RULE 1 — NO FREE ASSERTIONS
-When a specialist claims their framework explains the evidence, you demand the inferential step explicitly. "You say dynamic systems explains the bilingual asymmetry — show the actual argument. What is the mechanism, and why does your framework predict this result rather than merely accommodate it?" A framework summary is not an argument. Name it as such and refuse to move on.
-
-RULE 2 — STONEWALL PROTOCOL
-If a specialist repeats a framework summary instead of showing the inferential step, you name this directly: "That is the same assertion restated. You have not shown the argument." You then put the unanswered question to the specialist whose framework is most directly in tension with it: "DS Theorist — the Geneticist has declined to show how genetic programming predicts this specific result. Does that evasion tell you something?" Stonewalling becomes evidence.
-
-RULE 3 — DIRECTED ARBITRATION
-You do not rotate mechanically through all three specialists. You identify which two frameworks are most directly in tension on the specific point at issue and address only those two. You bring in the third only when they have something genuinely distinct to contribute — not as a matter of routine. Name who you are addressing and why.
-
-RULE 4 — STAY ON THE POINT
-You do not move to a new question until the current one has produced a genuine argumentative exchange — not just assertions from both sides. If the exchange has stalled without resolution, you name the exact point of impasse and make it explicit: "We have reached a genuine incommensurability here. Neither framework can accommodate this result without auxiliary assumptions. That is the finding."
-
-RULE 5 — NO PERIOD DRAMA
-You are not a host. You do not welcome people or set atmospheric scenes. You do not use phrases like "let's see what our specialists think" or "fascinating positions all round." You identify the theoretical problem, direct it at the right specialists, and hold them to account.
+FUNCTION 2 — ACADEMIC SECRETARY
+When the transcript provided to you begins with the instruction DRAFT OUTPUT PAPER, you step fully into the role of academic secretary. You will be given the full forum transcript. Your task is to write a conventional academic paper in prose throughout — no bullet points, no headers other than standard section titles, no lists. Structure it as follows: Abstract (100 words); Introduction presenting the theoretical question; a section on each specialist framework as revealed in the discussion; a section identifying the key points of genuine theoretical conflict; a Conclusion noting what empirical work would be needed to adjudicate between the frameworks. Write with scholarly precision. Do not declare winners. Preserve the incommensurabilities.
 
 The three specialists in this forum are:
 - Geneticist: molecular reductionist, voice of genetic determinism in developmental neuroscience
 - DS Theorist: dynamic systems theorist, voice of emergence and embodied self-organisation
 - Predictive Cognitivist: predictive cognition scientist, voice of the free energy principle and active inference
 
-When introducing or referring to the forum participants, always use these names and no others.
-
-PAPER-WRITING MODE: When the transcript provided to you begins with the instruction DRAFT OUTPUT PAPER, you step out of your chairing role entirely and into the role of academic secretary. You will be given the full forum transcript. Your task is to write a conventional academic paper in prose throughout — no bullet points, no headers other than standard section titles, no lists. Structure it as follows: Abstract (100 words); Introduction presenting the theoretical question; a section on each specialist framework as revealed in the discussion; a section identifying the key points of genuine theoretical conflict; a Conclusion noting what empirical work would be needed to adjudicate between the frameworks. Write with scholarly precision. Do not declare winners. Preserve the incommensurabilities."""
+When referring to forum participants, always use these names and no others."""
 }
 
 SPECIALIST_SEQUENCE = ['genetics', 'systems', 'predictive']
@@ -235,8 +225,8 @@ with st.sidebar:
                 st.caption(item['speaker'] + ': "' + item['text'][:60] + '..."')
             with col2:
                 if st.button("↓", key=f"send_{i}"):
-                    st.session_state.query_box = item['text']
-                    st.session_state.clear_flag = False
+                    st.session_state.dd_pending = item
+                    st.session_state.drill_queue.pop(i)
                     st.rerun()
             with col3:
                 if st.button("✕", key=f"remove_{i}"):
@@ -275,16 +265,50 @@ with st.sidebar:
 # --- Main interface ---
 if st.session_state.llm:
 
+    # If a DD is pending, show it prominently and fire on addressee selection
+    if st.session_state.dd_pending:
+        pending = st.session_state.dd_pending
+        preview = (pending['text'][:120] + '...') if len(pending['text']) > 120 else pending['text']
+        st.info('**Drill-down ready:** "' + preview + '"')
+        dd_recipient = st.selectbox(
+            "Address drill-down to:",
+            ["Geneticist", "DS Theorist", "Predictive Cognitivist", "Orchestrator"],
+            key="dd_recipient"
+        )
+        col_fire, col_cancel = st.columns([1, 1])
+        with col_fire:
+            if st.button("🔍 Fire drill-down", type="primary"):
+                dd_query = pending['text']
+                post_to_history('human', f"[Drill-down] {dd_query}")
+                recipient_map_dd = {
+                    "Orchestrator": "orchestrator",
+                    "Geneticist": "genetics",
+                    "DS Theorist": "systems",
+                    "Predictive Cognitivist": "predictive",
+                }
+                target_spec = recipient_map_dd[dd_recipient]
+                icon, label = SPEAKER_LABELS[target_spec]
+                with st.spinner(f"{label} is responding…"):
+                    response_text = call_agent(target_spec, dd_query)
+                    post_to_history(target_spec, response_text)
+                st.session_state.dd_pending = None
+                st.rerun()
+        with col_cancel:
+            if st.button("✕ Cancel"):
+                st.session_state.dd_pending = None
+                st.rerun()
+        st.markdown("---")
+
     recipient = st.selectbox(
         "Address to:",
-        ["Orchestrator", "Geneticist", "DS Theorist", "Predictive Cognitivist"]
+        ["Geneticist", "DS Theorist", "Predictive Cognitivist", "Orchestrator"]
     )
 
     # Cross-commentary selector removed — superseded by drill-down queue
     prior_turn_index = None
 
-    # Orchestrator always triggers all specialists in sequence
-    poll_all = (recipient == "Orchestrator")
+    # Orchestrator responds as itself only - human directs specialists directly
+    poll_all = False
 
     # --- PDF uploader ---
     uploaded_pdf = st.file_uploader(
@@ -330,30 +354,12 @@ if st.session_state.llm:
                 "Predictive Cognitivist": "predictive",
             }
 
-            if recipient == "Orchestrator":
-                # Jackie posts first, then each specialist responds in turn
-                with st.spinner("Orchestrator is opening the floor…"):
-                    jackie_text = call_agent('orchestrator', full_query)
-                    post_to_history('orchestrator', jackie_text)
-
-                for spec in SPECIALIST_SEQUENCE:
-                    time.sleep(15)
-                    icon, label = SPEAKER_LABELS[spec]
-                    with st.spinner(f"{label} is responding…"):
-                        spec_text = call_agent(spec, full_query)
-                        post_to_history(spec, spec_text)
-
-            else:
-                # Single recipient turn, with optional cross-commentary injection
-                target_spec = recipient_map[recipient]
-                prior_text = None
-                if prior_turn_index is not None:
-                    prior_text = st.session_state.history[prior_turn_index]['text']
-
-                icon, label = SPEAKER_LABELS[target_spec]
-                with st.spinner(f"{label} is responding…"):
-                    response_text = call_agent(target_spec, full_query, prior_turn_text=prior_text)
-                    post_to_history(target_spec, response_text)
+            # Single recipient turn
+            target_spec = recipient_map[recipient]
+            icon, label = SPEAKER_LABELS[target_spec]
+            with st.spinner(f"{label} is responding…"):
+                response_text = call_agent(target_spec, full_query)
+                post_to_history(target_spec, response_text)
 
             st.session_state.clear_flag = True
             st.rerun()
