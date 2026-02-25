@@ -7,7 +7,7 @@ import io
 import time
 
 st.set_page_config(
-    page_title="The Lyceum",
+    page_title="The Novum Lyceum",
     page_icon="🏛️",
     layout="wide",
     menu_items={
