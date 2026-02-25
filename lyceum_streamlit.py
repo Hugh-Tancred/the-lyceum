@@ -176,7 +176,7 @@ def post_to_history(spec, text):
     })
 
 # --- Page header ---
-st.title("🏛️ The Lyceum")
+st.title("🏛️ The Novum Lyceum")
 st.markdown("*A Forum for Theoretical Discourse on Developmental Neuroscience*")
 
 # --- Sidebar ---
