@@ -7,13 +7,13 @@ import io
 import time
 
 st.set_page_config(
-    page_title="The Lyceum",
+    page_title="The Novum Lyceum",
     page_icon="🏛️",
     layout="wide",
     menu_items={
         'Get Help': None,
         'Report a bug': None,
-        'About': "The Lyceum — A Platform for Theoretical Framework Integration through Artificial Deliberation"
+        'About': "The Novum Lyceum — A Platform for Theoretical Framework Integration through Artificial Deliberation"
     }
 )
 
@@ -176,8 +176,8 @@ def post_to_history(spec, text):
     })
 
 # --- Page header ---
-st.title("🏛️ The Lyceum")
-st.markdown("*A Forum for Theoretical Discourse on Developmental Neuroscience*")
+st.title("🏛️ The Novum Lyceum")
+st.markdown("*A Platform for Theoretical Framework Integration through Artificial Deliberation*")
 
 # --- Sidebar ---
 with st.sidebar:
@@ -444,7 +444,7 @@ else:
 st.markdown("---")
 st.markdown(
     '<p style="text-align:center; color:#8B7355; font-style:italic;">'
-    'The Lyceum — Where theoretical frameworks engage in productive discourse'
+    'The Novum Lyceum — Where theoretical frameworks engage in productive discourse'
     '</p>',
     unsafe_allow_html=True
 )
