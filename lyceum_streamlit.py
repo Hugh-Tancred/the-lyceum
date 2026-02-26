@@ -218,8 +218,9 @@ with st.sidebar:
 
 # --- Main interface ---
 if st.session_state.llm:
-    st.header("🎯 Drill-Down Queue")
+    # Only show drill-down queue header and content if there are items
     if st.session_state.drill_queue:
+        st.header("🎯 Drill-Down Queue")
         st.caption("Select a flagged passage and provide custom instructions for follow-up.")
         
         for i, item in enumerate(st.session_state.drill_queue):
@@ -285,7 +286,8 @@ Your instruction: {custom_instruction.strip()}"""
                         st.session_state.drill_queue.pop(i)
                         st.rerun()
         st.markdown("---")
-
+    
+    # Normal interface always shows
     recipient = st.selectbox(
         "Address to:",
         ["Geneticist", "DS Theorist", "Predictive Cognitivist", "Orchestrator"]
