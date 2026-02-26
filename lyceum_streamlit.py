@@ -7,13 +7,13 @@ import io
 import time
 
 st.set_page_config(
-    page_title="The Novum Lyceum",
+    page_title="The Lyceum",
     page_icon="🏛️",
     layout="wide",
     menu_items={
         'Get Help': None,
         'Report a bug': None,
-        'About': "The Lyceum — A Forum for Theoretical Discourse on Developmental Neuroscience"
+        'About': "The Lyceum — A Platform for Theoretical Framework Integration through Artificial Deliberation"
     }
 )
 
@@ -129,177 +129,161 @@ SPECIALIST_SEQUENCE = ['genetics', 'systems', 'predictive']
 
 SPEAKER_LABELS = {
     'genetics':     ('🧬', 'Geneticist'),
-    'systems':      ('🌊', 'DS Theorist'),
+    'systems':      ('🌀', 'DS Theorist'),
     'predictive':   ('🧠', 'Predictive Cognitivist'),
-    'orchestrator': ('📋', 'Orchestrator'),
-    'human':        ('👤', 'Forum Chair'),
+    'orchestrator': ('⚖️', 'Orchestrator'),
+    'human':        ('👤', 'Forum Chair')
 }
 
-def get_turn_options():
-    """Return a list of (index, label) for prior specialist turns, for the cross-commentary selector."""
-    options = []
-    for i, item in enumerate(st.session_state.history):
-        if item['spec'] in SPECIALIST_SEQUENCE:
-            icon, label = SPEAKER_LABELS[item['spec']]
-            ts = item.get('timestamp', '')
-            preview = item['text'][:60].replace('\n', ' ')
-            options.append((i, f"{label} [{ts}] — {preview}…"))
-    return options
+def call_agent(specialist: str, query: str) -> str:
+    """Call the LLM for a specialist's response."""
+    if st.session_state.llm is None:
+        return "[Error: API key not set]"
+    
+    system_msg = SystemMessage(content=PROMPTS[specialist])
+    human_msg = HumanMessage(content=query)
+    messages = [system_msg, human_msg]
+    
+    try:
+        response = st.session_state.llm.invoke(messages)
+        return response.content
+    except Exception as e:
+        return f"[API error: {e}]"
 
-def call_agent(spec, user_message, prior_turn_text=None):
-    """Call a single agent. If prior_turn_text is provided, inject it for cross-commentary."""
-    full_prompt = PROMPTS.get(spec, PROMPTS['orchestrator'])
-
-    if prior_turn_text:
-        human_content = (
-            f"{user_message}\n\n"
-            f"---\n"
-            f"The specific turn you are being asked to respond to is the following. "
-            f"Engage directly with what is said here — not with a general characterisation "
-            f"of that framework, but with the particular claims, moves, and formulations in this text:\n\n"
-            f"{prior_turn_text}"
-        )
-    else:
-        human_content = user_message
-
-    resp = st.session_state.llm.invoke([
-        SystemMessage(content=full_prompt),
-        HumanMessage(content=human_content)
-    ])
-    return resp.content
-
-def post_to_history(spec, text):
+def post_to_history(spec: str, text: str):
+    """Append a turn to the transcript."""
+    ts = datetime.now().strftime("%H:%M:%S")
     st.session_state.history.append({
         'spec': spec,
         'text': text,
-        'timestamp': datetime.now().strftime("%H:%M"),
+        'timestamp': ts
     })
 
-# --- Page header ---
-st.title("🏛️ The Novum Lyceum")
-st.markdown("*A Forum for Theoretical Discourse on Developmental Neuroscience*")
+def build_full_transcript() -> str:
+    """Build the full transcript as a string, newest first for download."""
+    lines = []
+    for item in reversed(st.session_state.history):
+        icon, label = SPEAKER_LABELS.get(item['spec'], ('❓', item['spec'].title()))
+        ts = item.get('timestamp', '')
+        lines.append(f"{icon} {label} [{ts}]")
+        lines.append(item['text'])
+        lines.append("")
+    return "\n".join(lines)
 
 # --- Sidebar ---
 with st.sidebar:
-    if st.session_state.llm is None:
-        try:
-            api_key = st.secrets["ANTHROPIC_API_KEY"]
+    st.title("🏛️ The Lyceum")
+    st.caption("A Platform for Theoretical Framework Integration through Artificial Deliberation")
+    
+    api_key = st.text_input("Anthropic API Key:", type="password")
+    if api_key:
+        if st.session_state.llm is None or st.session_state.get('api_key') != api_key:
             st.session_state.llm = ChatAnthropic(model="claude-sonnet-4-20250514", api_key=api_key)
-        except Exception:
-            st.error("API key not configured. Add ANTHROPIC_API_KEY to Streamlit secrets.")
-    if st.session_state.llm:
-        st.success("Connected")
-
-
+            st.session_state.api_key = api_key
+            st.success("API key loaded.")
+    
     st.markdown("---")
-    if st.button("Clear transcript"):
+    
+    mode = st.radio(
+        "Forum Mode:",
+        ["Conference", "Workshop", "Lab"],
+        help=(
+            "**Conference**: rigorous, fully-evidenced positions.\n"
+            "**Workshop**: show your work, uncertainty permitted.\n"
+            "**Lab**: brief, speculative thinking."
+        )
+    )
+    
+    if st.button("🗑️ Clear Transcript"):
         st.session_state.history = []
+        st.session_state.drill_queue = []
+        st.session_state.dd_pending = None
         st.rerun()
-
-    st.markdown("---")
+    
     if st.session_state.history:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"lyceum_transcript_{timestamp}.txt"
-        lines = []
-        for item in st.session_state.history:
-            _, label = SPEAKER_LABELS.get(item['spec'], ('', item['spec'].title()))
-            ts = item.get('timestamp', '')
-            lines.append(f"[{label}] [{ts}]")
-            lines.append(item['text'])
-            lines.append("")
-        transcript_content = "\n".join(lines)
+        transcript_str = build_full_transcript()
         st.download_button(
-            label="📄 Download transcript",
-            data=transcript_content,
-            file_name=filename,
+            label="📥 Download Transcript",
+            data=transcript_str,
+            file_name=f"lyceum_transcript_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
             mime="text/plain"
         )
-    else:
-        st.caption("No transcript to download yet.")
-
-    st.markdown("---")
-    st.markdown("**🔍 Drill-down queue**")
-    if st.session_state.drill_queue:
-        to_remove = []
-        for i, item in enumerate(st.session_state.drill_queue):
-            col1, col2, col3 = st.columns([3, 1, 1])
-            with col1:
-                st.caption(item['speaker'] + ': "' + item['text'][:60] + '..."')
-            with col2:
-                if st.button("↓", key=f"send_{i}"):
-                    st.session_state.dd_pending = item
-                    st.session_state.drill_queue.pop(i)
-                    st.rerun()
-            with col3:
-                if st.button("✕", key=f"remove_{i}"):
-                    to_remove.append(i)
-        for i in reversed(to_remove):
-            st.session_state.drill_queue.pop(i)
-        if to_remove:
-            st.rerun()
-    else:
-        st.caption("No items queued yet.")
-
-    st.markdown("---")
-    if st.button("✍️ Draft output paper", type="primary"):
-        if not st.session_state.llm:
-            st.warning("Not connected.")
-        elif not st.session_state.history:
-            st.warning("No transcript to work from.")
-        else:
-            transcript_lines = []
-            for item in st.session_state.history:
-                _, label = SPEAKER_LABELS.get(item['spec'], ('', item['spec'].title()))
-                ts = item.get('timestamp', '')
-                transcript_lines.append(f"[{label}] [{ts}]\n{item['text']}")
-            transcript_text = "\n\n---\n\n".join(transcript_lines)
-            paper_prompt = (
-                "DRAFT OUTPUT PAPER\n\n"
-                "Below is the full transcript of the forum discussion. "
-                "Please write the academic paper as instructed in your paper-writing mode.\n\n"
-                f"{transcript_text}"
-            )
+        
+        if st.button("📝 Draft Output Paper"):
             with st.spinner("Orchestrator is drafting the paper…"):
-                paper_text = call_agent('orchestrator', paper_prompt)
-                post_to_history('orchestrator', paper_text)
+                draft_query = "DRAFT OUTPUT PAPER\n\n" + transcript_str
+                paper = call_agent('orchestrator', draft_query)
+                post_to_history('orchestrator', paper)
             st.rerun()
 
 # --- Main interface ---
 if st.session_state.llm:
+    st.header("🎯 Drill-Down Queue")
+    if st.session_state.drill_queue:
+        st.caption("Select a flagged passage and provide custom instructions for follow-up.")
+        
+        for i, item in enumerate(st.session_state.drill_queue):
+            with st.expander(f"#{i+1}: {item['speaker']} — \"{item['text'][:60]}...\""):
+                st.markdown(f"**Flagged from:** {item['speaker']}")
+                st.markdown(f"**Passage:** {item['text']}")
+                
+                # Custom instruction input for this drill-down
+                instruction_key = f"dd_instruction_{i}"
+                custom_instruction = st.text_area(
+                    "Your drill-down instruction:",
+                    key=instruction_key,
+                    height=100,
+                    placeholder="E.g., 'Clarify what you mean by phase transition here' or 'Explain how this relates to the heritability data'",
+                    help="Provide context-specific guidance for how the specialist should engage with this passage."
+                )
+                
+                recipient_options = ["Geneticist", "DS Theorist", "Predictive Cognitivist"]
+                dd_recipient = st.selectbox(
+                    "Address to:",
+                    recipient_options,
+                    key=f"dd_recipient_{i}"
+                )
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("🔥 Fire drill-down", key=f"fire_{i}"):
+                        if not custom_instruction.strip():
+                            st.warning("Please provide an instruction for the drill-down.")
+                        else:
+                            # Build the drill-down query with custom instruction
+                            dd_query = f"""The following passage from the {item['speaker']}'s contribution has been flagged for follow-up:
 
-    # If a DD is pending, show it prominently and fire on addressee selection
-    if st.session_state.dd_pending:
-        pending = st.session_state.dd_pending
-        preview = (pending['text'][:120] + '...') if len(pending['text']) > 120 else pending['text']
-        st.info('**Drill-down ready:** "' + preview + '"')
-        dd_recipient = st.selectbox(
-            "Address drill-down to:",
-            ["Geneticist", "DS Theorist", "Predictive Cognitivist", "Orchestrator"],
-            key="dd_recipient"
-        )
-        col_fire, col_cancel = st.columns([1, 1])
-        with col_fire:
-            if st.button("🔍 Fire drill-down", type="primary"):
-                dd_query = pending['text']
-                post_to_history('human', f"[Drill-down] {dd_query}")
-                recipient_map_dd = {
-                    "Orchestrator": "orchestrator",
-                    "Geneticist": "genetics",
-                    "DS Theorist": "systems",
-                    "Predictive Cognitivist": "predictive",
-                }
-                target_spec = recipient_map_dd[dd_recipient]
-                icon, label = SPEAKER_LABELS[target_spec]
-                with st.spinner(f"{label} is responding…"):
-                    response_text = call_agent(target_spec, dd_query)
-                    post_to_history(target_spec, response_text)
-                st.session_state.dd_pending = None
-                st.session_state.scroll_to_top = True
-                st.rerun()
-        with col_cancel:
-            if st.button("✕ Cancel"):
-                st.session_state.dd_pending = None
-                st.rerun()
+"{item['text']}"
+
+Your instruction: {custom_instruction.strip()}"""
+                            
+                            # Map recipient to specialist code
+                            recipient_map = {
+                                "Geneticist": "genetics",
+                                "DS Theorist": "systems",
+                                "Predictive Cognitivist": "predictive"
+                            }
+                            target = recipient_map[dd_recipient]
+                            
+                            # Post the human drill-down instruction to history
+                            post_to_history('human', f"[Drill-down to {dd_recipient}] Re: \"{item['text'][:50]}...\"\n\n{custom_instruction.strip()}")
+                            
+                            # Get specialist response
+                            icon, label = SPEAKER_LABELS[target]
+                            with st.spinner(f"{label} is responding to drill-down…"):
+                                time.sleep(15)  # Rate limiting
+                                response = call_agent(target, dd_query)
+                                post_to_history(target, response)
+                            
+                            # Remove from queue
+                            st.session_state.drill_queue.pop(i)
+                            st.session_state.scroll_to_top = True
+                            st.rerun()
+                
+                with col2:
+                    if st.button("❌ Remove", key=f"remove_{i}"):
+                        st.session_state.drill_queue.pop(i)
+                        st.rerun()
         st.markdown("---")
 
     recipient = st.selectbox(
