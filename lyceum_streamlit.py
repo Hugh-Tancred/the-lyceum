@@ -353,10 +353,12 @@ def synthesise_speech(text: str, agent_key: str) -> bytes | None:
     Returns audio bytes or None on failure.
     """
     if st.session_state.el_client is None:
+        st.session_state['debug_msg'] = "el_client is None"
         return None
 
     voice_id = ELEVENLABS_VOICE_IDS.get(agent_key)
     if not voice_id or voice_id.startswith("PLACEHOLDER"):
+        st.session_state['debug_msg'] = f"bad voice_id: {voice_id} for agent_key: {agent_key}"
         return None
 
     try:
