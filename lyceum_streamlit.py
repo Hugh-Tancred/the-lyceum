@@ -836,8 +836,9 @@ if st.session_state.dd_pending:
                 st.session_state.scroll_to_top = True
 
                 if audio_bytes:
-                    st.session_state['latest_audio'] = audio_bytes
-                    st.session_state['latest_audio_agent'] = target_spec
+                st.session_state['latest_audio'] = audio_bytes
+                st.session_state['latest_audio_agent'] = target_spec
+                st.write(f"DEBUG: audio_bytes length = {len(audio_bytes)}")
 
                 st.rerun()
 
