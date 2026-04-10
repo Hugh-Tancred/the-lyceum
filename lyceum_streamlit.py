@@ -890,38 +890,37 @@ with st.expander("⌨️ Text input", expanded=True):
     )
 
     if st.button("Submit", type="primary", key="text_submit"):
-        if query.strip():
-            full_query = query.strip()
-            if pdf_text:
-                full_query = full_query + "\n\n---\nANCHOR PAPER:\n\n" + pdf_text
+    if query.strip():
+        full_query = query.strip()
+        if pdf_text:
+            full_query = full_query + "\n\n---\nANCHOR PAPER:\n\n" + pdf_text
 
-            recipient_map = {
-                "Orchestrator": "orchestrator",
-                "Geneticist": "genetics",
-                "DS Theorist": "systems",
-                "Predictive Cognitivist": "predictive",
-            }
-            target_spec = recipient_map[recipient]
+        recipient_map = {
+            "Orchestrator": "orchestrator",
+            "Geneticist": "genetics",
+            "DS Theorist": "systems",
+            "Predictive Cognitivist": "predictive",
+        }
+        target_spec = recipient_map[recipient]
 
-            response_text, audio_bytes = fire_query(target_spec, full_query)
-            st.session_state.clear_flag = True
+        response_text, audio_bytes = fire_query(target_spec, full_query)
+        st.session_state.clear_flag = True
+        st.session_state['debug_msg'] = f"audio_bytes={audio_bytes is not None}, audio_mode={st.session_state.audio_mode}, el_client={st.session_state.el_client is not None}"
 
-            if audio_bytes:
-                st.session_state['latest_audio'] = audio_bytes
-                st.session_state['latest_audio_agent'] = target_spec
+        if audio_bytes:
+            st.session_state['latest_audio'] = audio_bytes
+            st.session_state['latest_audio_agent'] = target_spec
 
-
-            if audio_bytes:
-                st.session_state['latest_audio'] = audio_bytes
-                st.session_state['latest_audio_agent'] = target_spec
-
-            st.rerun()
-        else:
-            st.warning("Please enter a query first.")
+        st.rerun()
+    else:
+        st.warning("Please enter a query first.")
 
 # =============================================================================
 # TRANSCRIPT
 # =============================================================================
+
+if st.session_state.get('debug_msg'):
+    st.warning(st.session_state['debug_msg'])
 
 st.markdown("---")
 st.markdown("### 💬 Forum Transcript")
