@@ -890,10 +890,10 @@ with st.expander("⌨️ Text input", expanded=True):
     )
 
     if st.button("Submit", type="primary", key="text_submit"):
-    if query.strip():
-        full_query = query.strip()
-        if pdf_text:
-            full_query = full_query + "\n\n---\nANCHOR PAPER:\n\n" + pdf_text
+        if query.strip():
+            full_query = query.strip()
+            if pdf_text:
+                full_query = full_query + "\n\n---\nANCHOR PAPER:\n\n" + pdf_text
 
         recipient_map = {
             "Orchestrator": "orchestrator",
