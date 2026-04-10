@@ -856,7 +856,7 @@ if st.session_state.dd_pending:
 # TEXT INPUT PANEL (available in both modes)
 # =============================================================================
 
-with st.expander("⌨️ Text input", expanded=not st.session_state.audio_mode):
+with st.expander("⌨️ Text input", expanded=True):
 
     recipient = st.selectbox(
         "Address to:",
