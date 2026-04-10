@@ -374,7 +374,7 @@ def synthesise_speech(text: str, agent_key: str) -> bytes | None:
         # ElevenLabs returns a generator; collect bytes
         return b"".join(audio)
     except Exception as e:
-        st.error(f"ElevenLabs error: {e}")
+        st.session_state['debug_msg'] = f"ElevenLabs error: {e}"
         return None
 
 
