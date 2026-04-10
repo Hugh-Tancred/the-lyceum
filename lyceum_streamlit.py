@@ -906,6 +906,11 @@ with st.expander("⌨️ Text input", expanded=not st.session_state.audio_mode):
                 st.session_state['latest_audio'] = audio_bytes
                 st.session_state['latest_audio_agent'] = target_spec
 
+
+            if audio_bytes:
+                st.session_state['latest_audio'] = audio_bytes
+                st.session_state['latest_audio_agent'] = target_spec
+
             st.rerun()
         else:
             st.warning("Please enter a query first.")
