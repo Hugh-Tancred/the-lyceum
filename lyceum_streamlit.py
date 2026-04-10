@@ -830,6 +830,7 @@ if st.session_state.dd_pending:
                 if st.session_state.audio_mode and st.session_state.el_client:
                     with st.spinner(f"Synthesising {label}'s voice…"):
                         audio_bytes = synthesise_speech(response_text, target_spec)
+                        st.write(f"DEBUG: audio_mode={st.session_state.audio_mode}, el_client={st.session_state.el_client is not None}, audio_bytes={audio_bytes is not None}")
 
                 st.session_state.audio_status = 'idle'
                 st.session_state.dd_pending = None
