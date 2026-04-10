@@ -426,9 +426,11 @@ def fire_query(target_spec: str, query_text: str, prior_turn_text: str | None = 
     post_to_history(target_spec, response_text)
 
     audio_bytes = None
+    st.write(f"DEBUG fire_query: audio_mode={st.session_state.audio_mode}, el_client={st.session_state.el_client is not None}")
     if st.session_state.audio_mode and st.session_state.el_client:
         with st.spinner(f"Synthesising {label}'s voice…"):
             audio_bytes = synthesise_speech(response_text, target_spec)
+    st.write(f"DEBUG fire_query: audio_bytes={audio_bytes is not None}")
 
     return response_text, audio_bytes
 
