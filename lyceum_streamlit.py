@@ -348,7 +348,7 @@ def find_drill_down_target(reference_text: str) -> dict | None:
 
 
 def synthesise_speech(text: str, agent_key: str) -> bytes | None:
-    st.session_state['debug_msg'] = f"synthesise_speech called: agent_key={agent_key}"
+    st.session_state['debug_msg'] = st.session_state.get('debug_msg', '') + f" | synth called: agent_key={agent_key}"
     """
     Call ElevenLabs to synthesise the agent's response.
     Returns audio bytes or None on failure.
