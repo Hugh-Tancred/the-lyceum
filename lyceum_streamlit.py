@@ -12,7 +12,10 @@ import re
 # --- Audio dependencies ---
 # pip install openai elevenlabs sounddevice numpy
 import numpy as np
-import sounddevice as sd
+try:
+    import sounddevice as sd
+except OSError:
+    sd = None
 import openai
 from elevenlabs.client import ElevenLabs
 from elevenlabs import VoiceSettings
