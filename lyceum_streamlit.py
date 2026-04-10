@@ -466,7 +466,7 @@ with st.sidebar:
             el_key = st.secrets["ELEVENLABS_API_KEY"]
             st.session_state.el_client = ElevenLabs(api_key=el_key)
         except Exception as e:
-    st.warning(f"ElevenLabs error: {e}")
+            st.warning(f"ElevenLabs error: {e}")
 
     # Connection status
     col_a, col_b, col_c = st.columns(3)
