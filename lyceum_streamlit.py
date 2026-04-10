@@ -1,3 +1,10 @@
+"""
+The Novum Lyceum — Virtual Lab 2.0
+A Platform for Theoretical Framework Integration through Artificial Deliberation
+
+Clean rewrite: April 2026
+"""
+
 import streamlit as st
 from langchain_anthropic import ChatAnthropic
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -8,43 +15,40 @@ import time
 import tempfile
 import os
 import re
-
-# --- Audio dependencies ---
-# pip install openai elevenlabs sounddevice numpy
 import numpy as np
+
+# Audio dependencies
 try:
     import sounddevice as sd
 except OSError:
     sd = None
+
 import openai
 from elevenlabs.client import ElevenLabs
 from elevenlabs import VoiceSettings
 
 # =============================================================================
-# CONFIGURATION — fill in before use
+# CONFIGURATION
 # =============================================================================
 
-# ElevenLabs voice IDs — replace with your actual voice IDs from elevenlabs.io
-# Suggested voice profile:
-#   Geneticist    : authoritative British male  (e.g. "Adam" or custom clone)
-#   DS Theorist   : warm American female        (e.g. "Rachel" or custom clone)
-#   Predictive    : precise Australian male     (e.g. "Callum" or custom clone)
-#   Orchestrator  : neutral British female      (e.g. "Bella" or custom clone)
+# ElevenLabs voice IDs
 ELEVENLABS_VOICE_IDS = {
-    "genetics":     "lUTamkMw7gOzZbFIwmq4",
-    "systems":      "a4SZwHT3FMKGrM6vbf60",
-    "predictive":   "abRFZIdN4pvo8ZPmGxHP",
-    "orchestrator": "jB2lPb5DhAX6l1TLkKXy",
+    "genetics":     "lUTamkMw7gOzZbFIwmq4",  # Brian - authoritative British male
+    "systems":      "a4SZwHT3FMKGrM6vbf60",  # crisp American female
+    "predictive":   "abRFZIdN4pvo8ZPmGxHP",  # Australian male
+    "orchestrator": "jB2lPb5DhAX6l1TLkKXy",  # British female
 }
 
 # Recording settings
-SAMPLE_RATE = 16000   # Hz — Whisper works well at 16kHz
-CHANNELS = 1          # Mono
-MAX_RECORD_SECONDS = 60  # Safety cap on recording length
+SAMPLE_RATE = 16000
+CHANNELS = 1
+MAX_RECORD_SECONDS = 60
 
-# Semantic similarity threshold for drill-down reference matching (0–1)
+# Semantic similarity threshold for drill-down reference matching
 SIMILARITY_THRESHOLD = 0.35
 
+# =============================================================================
+# PAGE CONFIG & STYLES
 # =============================================================================
 
 st.set_page_config(
@@ -62,11 +66,11 @@ st.markdown("""
 <style>
 .stApp {background: linear-gradient(to bottom, #E8D5B7, #F5E6D3, #D4A76A, #C19A6B);}
 [data-testid="stDeployButton"] {display: none !important;}
-.speaker-genetics    {background: #E8F5E9; border-left: 4px solid #4CAF50; padding: 15px; margin: 10px 0;}
-.speaker-systems     {background: #E3F2FD; border-left: 4px solid #2196F3; padding: 15px; margin: 10px 0;}
-.speaker-predictive  {background: #FFF3E0; border-left: 4px solid #FF9800; padding: 15px; margin: 10px 0;}
-.speaker-orchestrator{background: #F3E5F5; border-left: 4px solid #9C27B0; padding: 15px; margin: 10px 0;}
-.speaker-human       {background: #FAFAFA; border-left: 4px solid #607D8B; padding: 15px; margin: 10px 0;}
+.speaker-genetics    {background: #E8F5E9; border-left: 4px solid #4CAF50; padding: 15px; margin: 10px 0; border-radius: 4px;}
+.speaker-systems     {background: #E3F2FD; border-left: 4px solid #2196F3; padding: 15px; margin: 10px 0; border-radius: 4px;}
+.speaker-predictive  {background: #FFF3E0; border-left: 4px solid #FF9800; padding: 15px; margin: 10px 0; border-radius: 4px;}
+.speaker-orchestrator{background: #F3E5F5; border-left: 4px solid #9C27B0; padding: 15px; margin: 10px 0; border-radius: 4px;}
+.speaker-human       {background: #FAFAFA; border-left: 4px solid #607D8B; padding: 15px; margin: 10px 0; border-radius: 4px;}
 .audio-panel         {background: #1a1a2e; border-radius: 8px; padding: 16px; margin: 12px 0; color: #eee;}
 .status-listening    {color: #00ff88; font-weight: bold;}
 .status-processing   {color: #ffaa00; font-weight: bold;}
@@ -74,30 +78,45 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- Session state initialisation ---
-defaults = {
+# =============================================================================
+# SESSION STATE INITIALISATION
+# =============================================================================
+
+DEFAULTS = {
+    # API clients
     'llm': None,
     'el_client': None,
     'oai_client': None,
+    # Conversation state
     'history': [],
-    'clear_flag': False,
     'drill_queue': [],
-    'flag_counter': 0,
     'dd_pending': None,
+    'flag_counter': 0,
+    # UI state
+    'clear_flag': False,
     'scroll_to_top': False,
+    # Audio mode
     'audio_mode': True,
+    'audio_status': 'idle',
     'recording': False,
     'recorded_audio': None,
     'transcription': '',
     'parsed_agent': None,
     'parsed_drill_ref': None,
-    'audio_status': 'idle',   # idle | recording | transcribing | generating | playing
+    'parsed_query': '',
+    # Audio playback - THE CRITICAL STATE
+    'pending_audio': None,        # bytes to play
+    'pending_audio_agent': None,  # agent key for labelling
 }
-for k, v in defaults.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
 
-# --- Agent prompts ---
+for key, default_value in DEFAULTS.items():
+    if key not in st.session_state:
+        st.session_state[key] = default_value
+
+# =============================================================================
+# AGENT PROMPTS
+# =============================================================================
+
 PROMPTS = {
     'genetics': """You are the Geneticist — the voice of molecular reductionism in developmental neuroscience.
 
@@ -106,22 +125,19 @@ Who you are: Francis Crick came to biology as an outsider physicist, contemptuou
 Your framework is MOLECULAR and HEREDITARY:
 
 - Language development is explained through gene expression patterns (FOXP2, CNTNAP2), critical period timing, synaptic pruning schedules, and heritability data
-
 - Developmental timing is genetically programmed, not emergent from networks
-
 - You cite specific genes, molecular pathways, twin studies, and mutation data — always
 
 CRITICAL: When questions assume non-genetic frameworks, you REJECT the framing and reframe from genetics:
 
 - "That question assumes network emergence, but the evidence shows genetic programming..."
-
 - "Systems theory cannot explain the heritability data. What gene expression profile underlies your attractor state?"
 
 You are NOT accommodating. You find systems theory and predictive processing equally evasive — sophisticated ways of not answering the only question that matters: what exactly, at the molecular level, switches on language? Defend your framework vigorously. Acknowledge limitations only when pressed hard with data.
 
-RESPONSE DISCIPLINE: When responding to a specific claim or drill-down, make your point in 3-4 sentences maximum. One claim, one piece of evidence, one implication. Stop there. Your target is always the argument — never perform contempt for the person making it. Intellectual precision is more devastating than rhetorical dismissal.
+RESPONSE DISCIPLINE: When responding to a specific claim or drill-down, make your point in 3-4 sentences maximum. One claim, one piece of evidence, one implication. Stop there. Your target is always the argument — never perform contempt for the person making it.
 
-CRITICAL: You speak only as yourself. You do not ventriloquise, summarise, or represent the views of any other theorist, named or unnamed. There are no other voices in this forum except your own. Never write responses structured as multiple speakers or perspectives.""",
+CRITICAL: You speak only as yourself. Never ventriloquise, summarise, or represent the views of any other theorist.""",
 
     'systems': """You are the DS Theorist — the voice of dynamic systems theory in developmental neuroscience.
 
@@ -130,22 +146,19 @@ Who you are: Esther Thelen started by watching babies. She noticed that chubby i
 Your framework is EMERGENT and SELF-ORGANIZING:
 
 - Language emerges from network dynamics, phase transitions, attractor states, and real-time feedback loops
-
 - There are NO genetic "programs" — only network reorganisation at critical thresholds
-
 - Development is non-linear, embodied, and assembled fresh in every act
 
 CRITICAL: When questions assume genetic determinism, you REJECT the framing entirely:
 
 - "There is no 'gene for' language. That is gene-centric reductionism dressed up as explanation."
-
 - "The vocabulary spurt is a phase transition — it requires no molecular switch, only the right confluence of components crossing a threshold together."
 
-You are combative when your framework is misunderstood or caricatured. You have no patience for disembodied computation either — the Predictive Cognitivist's hierarchical generative models are just genetics in mathematical clothing, top-down control pretending to be emergence. Acknowledge what systems approaches cannot yet explain only when the data genuinely force you.
+You are combative when your framework is misunderstood or caricatured. You have no patience for disembodied computation either — the Predictive Cognitivist's hierarchical generative models are just genetics in mathematical clothing. Acknowledge what systems approaches cannot yet explain only when the data genuinely force you.
 
-RESPONSE DISCIPLINE: When responding to a specific claim or drill-down, make your point in 3-4 sentences maximum. One claim, one piece of evidence, one implication. Stop there. Your target is always the argument — attack the reasoning, not the person. The sharpest responses are the shortest ones.
+RESPONSE DISCIPLINE: When responding to a specific claim or drill-down, make your point in 3-4 sentences maximum. One claim, one piece of evidence, one implication. Stop there.
 
-CRITICAL: You speak only as yourself. You do not ventriloquise, summarise, or represent the views of any other theorist, named or unnamed. There are no other voices in this forum except your own. Never write responses structured as multiple speakers or perspectives.""",
+CRITICAL: You speak only as yourself. Never ventriloquise, summarise, or represent the views of any other theorist.""",
 
     'predictive': """You are the Predictive Cognitivist — the voice of predictive cognition and the free energy principle in developmental neuroscience.
 
@@ -154,50 +167,35 @@ Who you are: Karl Friston invented the statistical tools that made modern neuroi
 Your framework is COMPUTATIONAL and BAYESIAN:
 
 - Development is explained through precision-weighting, prediction error minimisation, hierarchical generative models, and active inference
-
 - The vocabulary spurt reflects a phase transition in the child's generative model — a reorganisation of prior precision across lexical hierarchies
-
 - Learning is Bayesian model updating; genes set priors, environments supply prediction errors
 
 CRITICAL: When questions assume either genetic programming OR pure emergence, you REJECT both:
 
 - "Crick's framework describes the substrate, not the computation. Knowing which gene is expressed tells you nothing about the inference the system is performing."
-
 - "Thelen's attractors are real, but they are not explanations — they are the thing that needs explaining. What is the generative model that produces that attractor landscape?"
 
 You are assertive and precise. You do not perform humility. You acknowledge the framework's mathematical opacity when pressed, but you do not concede that opacity is the same as unfalsifiability.
 
-RESPONSE DISCIPLINE: When responding to a specific claim or drill-down, make your point in 3-4 sentences maximum. One claim, one piece of evidence, one implication. Stop there. Your target is always the argument — precision is more persuasive than provocation. Do not mistake assertiveness for aggression.
+RESPONSE DISCIPLINE: When responding to a specific claim or drill-down, make your point in 3-4 sentences maximum. One claim, one piece of evidence, one implication. Stop there.
 
-CRITICAL: You speak only as yourself. You do not ventriloquise, summarise, or represent the views of any other theorist, named or unnamed. There are no other voices in this forum except your own. Never write responses structured as multiple speakers or perspectives.""",
+CRITICAL: You speak only as yourself. Never ventriloquise, summarise, or represent the views of any other theorist.""",
 
     'orchestrator': """You have two functions in this forum and two functions only.
 
 FUNCTION 1 — TRAFFIC COP
 
-You are called upon when the Forum Chair decides a specialist has breached the standards of the forum. Your intervention is brief and surgical — 2-3 sentences maximum. You name the specific breach: grandstanding, prolixity, framework assertion without argument, repetition of a prior claim, or failure to engage with the specific point on the table. You then direct the specialist to try again, or invite the opposing specialist to exploit the evasion. You do not summarise, contextualise, or editoralise. You do not speak as or for any specialist.
+You are called upon when the Forum Chair decides a specialist has breached the standards of the forum. Your intervention is brief and surgical — 2-3 sentences maximum. You name the specific breach: grandstanding, prolixity, framework assertion without argument, repetition of a prior claim, or failure to engage with the specific point on the table. You then direct the specialist to try again, or invite the opposing specialist to exploit the evasion. You do not summarise, contextualise, or editoralise.
 
 Examples of legitimate interventions:
 
 - "Geneticist: that is a framework summary, not an argument. Show the inferential step or cede the point."
-
 - "DS Theorist: you have said this twice. The Predictive Cognitivist has not responded to it. Predictive Cognitivist — why not?"
-
 - "That response exceeded the scope of the question. Restate in two sentences."
 
 FUNCTION 2 — ACADEMIC SECRETARY
 
-When the transcript provided to you begins with the instruction DRAFT OUTPUT PAPER, you step fully into the role of academic secretary. You will be given the full forum transcript. Your task is to write a conventional academic paper in prose throughout — no bullet points, no headers other than standard section titles, no lists. Structure it as follows: Abstract (100 words); Introduction presenting the theoretical question; a section on each specialist framework as revealed in the discussion; a section identifying the key points of genuine theoretical conflict; a Conclusion noting what empirical work would be needed to adjudicate between the frameworks. Write with scholarly precision. Do not declare winners. Preserve the incommensurabilities.
-
-The three specialists in this forum are:
-
-- Geneticist: molecular reductionist, voice of genetic determinism in developmental neuroscience
-
-- DS Theorist: dynamic systems theorist, voice of emergence and embodied self-organisation
-
-- Predictive Cognitivist: predictive cognition scientist, voice of the free energy principle and active inference
-
-When referring to forum participants, always use these names and no others."""
+When the transcript provided to you begins with the instruction DRAFT OUTPUT PAPER, you step fully into the role of academic secretary. You will be given the full forum transcript. Your task is to write a conventional academic paper in prose throughout — no bullet points, no headers other than standard section titles, no lists. Structure it as follows: Abstract (100 words); Introduction presenting the theoretical question; a section on each specialist framework as revealed in the discussion; a section identifying the key points of genuine theoretical conflict; a Conclusion noting what empirical work would be needed to adjudicate between the frameworks. Write with scholarly precision. Do not declare winners. Preserve the incommensurabilities."""
 }
 
 SPECIALIST_SEQUENCE = ['genetics', 'systems', 'predictive']
@@ -212,29 +210,20 @@ SPEAKER_LABELS = {
 
 # Agent name aliases for speech parsing
 AGENT_NAME_MAP = {
-    # Geneticist variants
-    'geneticist': 'genetics',
-    'genetics': 'genetics',
-    'genetic': 'genetics',
-    'crick': 'genetics',
-    # DS Theorist variants
-    'ds theorist': 'systems',
-    'systems': 'systems',
-    'dynamic systems': 'systems',
-    'systems theorist': 'systems',
-    'thelen': 'systems',
-    # Predictive Cognitivist variants
-    'predictive cognitivist': 'predictive',
-    'predictive': 'predictive',
-    'friston': 'predictive',
-    'cognitivist': 'predictive',
-    'bayesian': 'predictive',
-    # Orchestrator variants
-    'orchestrator': 'orchestrator',
-    'coordinator': 'orchestrator',
-    'chair': 'orchestrator',
+    'geneticist': 'genetics', 'genetics': 'genetics', 'genetic': 'genetics', 'crick': 'genetics',
+    'ds theorist': 'systems', 'systems': 'systems', 'dynamic systems': 'systems',
+    'systems theorist': 'systems', 'thelen': 'systems',
+    'predictive cognitivist': 'predictive', 'predictive': 'predictive',
+    'friston': 'predictive', 'cognitivist': 'predictive', 'bayesian': 'predictive',
+    'orchestrator': 'orchestrator', 'coordinator': 'orchestrator', 'chair': 'orchestrator',
 }
 
+RECIPIENT_MAP = {
+    "Orchestrator": "orchestrator",
+    "Geneticist": "genetics",
+    "DS Theorist": "systems",
+    "Predictive Cognitivist": "predictive",
+}
 
 # =============================================================================
 # AUDIO UTILITIES
@@ -242,6 +231,9 @@ AGENT_NAME_MAP = {
 
 def record_audio(duration_seconds: int) -> np.ndarray:
     """Record audio from the default microphone."""
+    if sd is None:
+        st.error("sounddevice not available — cannot record.")
+        return np.array([])
     audio = sd.rec(
         int(duration_seconds * SAMPLE_RATE),
         samplerate=SAMPLE_RATE,
@@ -256,20 +248,19 @@ def transcribe_audio(audio_array: np.ndarray) -> str:
     """Send audio array to OpenAI Whisper API and return transcript."""
     if st.session_state.oai_client is None:
         return ""
+    if audio_array.size == 0:
+        return ""
 
-    # Write to a temporary WAV file for the API
     import wave
-    import struct
 
     with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
         tmp_path = tmp.name
 
     try:
-        # Convert float32 to int16 for WAV
         audio_int16 = (audio_array * 32767).astype(np.int16)
         with wave.open(tmp_path, 'wb') as wf:
             wf.setnchannels(CHANNELS)
-            wf.setsampwidth(2)  # 2 bytes = int16
+            wf.setsampwidth(2)
             wf.setframerate(SAMPLE_RATE)
             wf.writeframes(audio_int16.tobytes())
 
@@ -285,25 +276,15 @@ def transcribe_audio(audio_array: np.ndarray) -> str:
 
 
 def parse_agent_from_transcript(text: str) -> tuple[str | None, str]:
-    """
-    Extract the intended agent from a spoken query.
-    Returns (agent_key, cleaned_text).
-
-    Strategy: look for agent name/alias at the start of the utterance,
-    e.g. "Geneticist, what do you make of..." or "DS Theorist — could you explain..."
-    """
+    """Extract the intended agent from a spoken query. Returns (agent_key, cleaned_text)."""
     text_lower = text.lower().strip()
-
-    # Try longest aliases first to avoid partial matches
     sorted_aliases = sorted(AGENT_NAME_MAP.keys(), key=len, reverse=True)
 
     for alias in sorted_aliases:
-        # Match alias at start of utterance, optionally followed by punctuation
         pattern = r'^' + re.escape(alias) + r'[\s,\-–—:\.]*'
         match = re.match(pattern, text_lower)
         if match:
             agent_key = AGENT_NAME_MAP[alias]
-            # Remove the agent address from the spoken text
             cleaned = text[match.end():].strip()
             return agent_key, cleaned
 
@@ -311,16 +292,11 @@ def parse_agent_from_transcript(text: str) -> tuple[str | None, str]:
 
 
 def find_drill_down_target(reference_text: str) -> dict | None:
-    """
-    Find the most semantically similar passage in history to the spoken reference.
-    Uses simple TF-IDF-style overlap scoring (no external embedding needed).
-    Returns the best matching history item or None if below threshold.
-    """
+    """Find the most semantically similar passage in history to the spoken reference."""
     if not st.session_state.history or not reference_text.strip():
         return None
 
     def token_overlap(a: str, b: str) -> float:
-        """Jaccard similarity on word tokens, ignoring stopwords."""
         stopwords = {'the', 'a', 'an', 'is', 'it', 'of', 'to', 'in', 'and',
                      'that', 'this', 'was', 'for', 'on', 'are', 'with', 'you',
                      'your', 'but', 'not', 'what', 'how', 'do', 'does', 'by',
@@ -348,18 +324,12 @@ def find_drill_down_target(reference_text: str) -> dict | None:
 
 
 def synthesise_speech(text: str, agent_key: str) -> bytes | None:
-    st.session_state['debug_msg'] = st.session_state.get('debug_msg', '') + f" | synth called: agent_key={agent_key}"
-    """
-    Call ElevenLabs to synthesise the agent's response.
-    Returns audio bytes or None on failure.
-    """
+    """Call ElevenLabs to synthesise the agent's response. Returns audio bytes or None."""
     if st.session_state.el_client is None:
-        st.session_state['debug_msg'] = "el_client is None"
         return None
 
     voice_id = ELEVENLABS_VOICE_IDS.get(agent_key)
-    if not voice_id or voice_id.startswith("PLACEHOLDER"):
-        st.session_state['debug_msg'] = f"bad voice_id: {voice_id} for agent_key: {agent_key}"
+    if not voice_id:
         return None
 
     try:
@@ -374,10 +344,9 @@ def synthesise_speech(text: str, agent_key: str) -> bytes | None:
             ),
             model="eleven_multilingual_v2"
         )
-        # ElevenLabs returns a generator; collect bytes
         return b"".join(audio)
     except Exception as e:
-        st.session_state['debug_msg'] = f"ElevenLabs error: {e}"
+        st.error(f"ElevenLabs synthesis error: {e}")
         return None
 
 
@@ -386,6 +355,7 @@ def synthesise_speech(text: str, agent_key: str) -> bytes | None:
 # =============================================================================
 
 def call_agent(spec: str, user_message: str, prior_turn_text: str | None = None) -> str:
+    """Call the specified agent and return the response text."""
     full_prompt = PROMPTS.get(spec, PROMPTS['orchestrator'])
 
     if prior_turn_text:
@@ -408,6 +378,7 @@ def call_agent(spec: str, user_message: str, prior_turn_text: str | None = None)
 
 
 def post_to_history(spec: str, text: str):
+    """Add an entry to the conversation history."""
     st.session_state.history.append({
         'spec': spec,
         'text': text,
@@ -415,12 +386,12 @@ def post_to_history(spec: str, text: str):
     })
 
 
-def fire_query(target_spec: str, query_text: str, prior_turn_text: str | None = None):
+def fire_query(target_spec: str, query_text: str, prior_turn_text: str | None = None) -> tuple[str, bytes | None]:
     """
-    Unified query firing: call agent, post to history, synthesise audio.
+    Unified query firing: call agent, post to history, synthesise audio if in audio mode.
     Returns (response_text, audio_bytes_or_None).
     """
-    icon, label = SPEAKER_LABELS[target_spec]
+    _, label = SPEAKER_LABELS[target_spec]
     post_to_history('human', query_text)
 
     with st.spinner(f"{label} is responding…"):
@@ -429,13 +400,12 @@ def fire_query(target_spec: str, query_text: str, prior_turn_text: str | None = 
     post_to_history(target_spec, response_text)
 
     audio_bytes = None
-    st.session_state['debug_msg'] = f"fire_query reached: audio_mode={st.session_state.audio_mode}, el_client={st.session_state.el_client is not None}"
     if st.session_state.audio_mode and st.session_state.el_client:
         with st.spinner(f"Synthesising {label}'s voice…"):
             audio_bytes = synthesise_speech(response_text, target_spec)
-    st.session_state['debug_msg'] = f"fire_query done: audio_bytes={audio_bytes is not None}, audio_mode={st.session_state.audio_mode}, el_client={st.session_state.el_client is not None}"
 
     return response_text, audio_bytes
+
 
 # =============================================================================
 # PAGE HEADER
@@ -459,21 +429,21 @@ with st.sidebar:
                 api_key=anthropic_key
             )
         except Exception:
-            st.error("Anthropic API key not configured.\nAdd ANTHROPIC_API_KEY to Streamlit secrets.")
+            st.error("Anthropic API key not configured.")
 
     if st.session_state.oai_client is None:
         try:
             oai_key = st.secrets["OPENAI_API_KEY"]
             st.session_state.oai_client = openai.OpenAI(api_key=oai_key)
         except Exception:
-            st.warning("OpenAI key not set — voice input disabled.\nAdd OPENAI_API_KEY to secrets.")
+            st.warning("OpenAI key not set — voice input disabled.")
 
     if st.session_state.el_client is None:
         try:
             el_key = st.secrets["ELEVENLABS_API_KEY"]
             st.session_state.el_client = ElevenLabs(api_key=el_key)
         except Exception as e:
-            st.warning(f"ElevenLabs error: {e}")
+            st.warning(f"ElevenLabs not connected: {e}")
 
     # Connection status
     col_a, col_b, col_c = st.columns(3)
@@ -486,7 +456,7 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # --- Audio mode toggle ---
+    # Audio mode toggle
     st.session_state.audio_mode = st.toggle(
         "🎙️ Audio mode",
         value=st.session_state.audio_mode,
@@ -495,16 +465,17 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # --- Session management ---
+    # Session management
     if st.button("Clear transcript"):
         st.session_state.history = []
         st.session_state.drill_queue = []
         st.session_state.dd_pending = None
+        st.session_state.pending_audio = None
         st.rerun()
 
     st.markdown("---")
 
-    # --- Transcript download ---
+    # Transcript download
     if st.session_state.history:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"lyceum_transcript_{timestamp}.txt"
@@ -526,7 +497,7 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # --- Drill-down queue ---
+    # Drill-down queue
     st.markdown("**🔍 Drill-down queue**")
     if st.session_state.drill_queue:
         to_remove = []
@@ -551,7 +522,7 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # --- Draft paper ---
+    # Draft paper
     if st.button("✍️ Draft output paper", type="primary"):
         if not st.session_state.llm:
             st.warning("Not connected.")
@@ -585,7 +556,25 @@ if not st.session_state.llm:
     st.stop()
 
 # =============================================================================
-# AUDIO INPUT PANEL
+# AUDIO PLAYBACK — RENDERED FIRST, OUTSIDE ALL CONDITIONALS
+# =============================================================================
+# This is the critical fix: audio playback must happen early in the render cycle,
+# not buried inside conditional blocks that may not execute after st.rerun()
+
+if st.session_state.pending_audio is not None:
+    _, agent_label = SPEAKER_LABELS.get(
+        st.session_state.pending_audio_agent or 'orchestrator', ('', 'Agent')
+    )
+    st.markdown(f"### 🔊 {agent_label} is speaking:")
+    st.audio(st.session_state.pending_audio, format="audio/mp3", autoplay=True)
+    if st.button("✕ Dismiss audio", key="dismiss_audio_main"):
+        st.session_state.pending_audio = None
+        st.session_state.pending_audio_agent = None
+        st.rerun()
+    st.markdown("---")
+
+# =============================================================================
+# AUDIO INPUT PANEL (voice mode)
 # =============================================================================
 
 if st.session_state.audio_mode:
@@ -594,15 +583,16 @@ if st.session_state.audio_mode:
 
     if not st.session_state.oai_client:
         st.warning("OpenAI API key required for voice input (Whisper transcription).")
+    elif sd is None:
+        st.warning("sounddevice not available — voice recording disabled.")
     else:
-        # Recording duration selector
         rec_duration = st.slider(
             "Recording duration (seconds)",
             min_value=5,
             max_value=MAX_RECORD_SECONDS,
             value=20,
             step=5,
-            help="Set before pressing Record. Adjust based on expected query length."
+            help="Set before pressing Record."
         )
 
         col_rec, col_status = st.columns([1, 3])
@@ -611,7 +601,7 @@ if st.session_state.audio_mode:
                 "⏺ Record",
                 type="primary",
                 disabled=st.session_state.recording,
-                help="Press to begin recording. Recording stops automatically after the set duration."
+                help="Press to begin recording."
             )
         with col_status:
             status = st.session_state.audio_status
@@ -637,12 +627,10 @@ if st.session_state.audio_mode:
             st.session_state.transcription = transcript_text
             st.session_state.audio_status = 'idle'
 
-            # Parse agent name from transcript
             agent_key, cleaned_query = parse_agent_from_transcript(transcript_text)
             st.session_state.parsed_agent = agent_key
-            st.session_state['parsed_query'] = cleaned_query
+            st.session_state.parsed_query = cleaned_query
 
-            # Check for drill-down reference trigger words
             drill_triggers = ['referring to', 'you said', 'you mentioned', 'what you said',
                               'that point about', 'earlier comment', 'the passage about',
                               'drill down on', 'go deeper on', 'follow up on']
@@ -655,7 +643,7 @@ if st.session_state.audio_mode:
 
             st.rerun()
 
-        # --- Show transcription and parsed intent ---
+        # Show transcription and parsed intent
         if st.session_state.transcription:
             st.markdown("**Transcription:**")
             edited_transcript = st.text_area(
@@ -666,7 +654,6 @@ if st.session_state.audio_mode:
                 key="transcript_edit"
             )
 
-            # Agent detection feedback
             agent_names = {
                 'genetics': 'Geneticist',
                 'systems': 'DS Theorist',
@@ -679,7 +666,6 @@ if st.session_state.audio_mode:
             else:
                 st.warning("No agent detected in transcript. Please select manually below.")
 
-            # Drill-down reference feedback
             if st.session_state.parsed_drill_ref:
                 matched_item = find_drill_down_target(st.session_state.parsed_drill_ref)
                 if matched_item:
@@ -696,52 +682,41 @@ if st.session_state.audio_mode:
                         st.session_state.parsed_drill_ref = None
                         st.rerun()
                 else:
-                    st.warning("Drill-down reference detected but no close match found in transcript. Use manual queue below.")
+                    st.warning("Drill-down reference detected but no close match found.")
 
-            # Manual agent override
             manual_agent = st.selectbox(
                 "Address to (override):",
                 ["— auto-detected —", "Geneticist", "DS Theorist", "Predictive Cognitivist", "Orchestrator"],
                 key="manual_agent_select"
             )
 
-            recipient_map = {
-                "Geneticist": "genetics",
-                "DS Theorist": "systems",
-                "Predictive Cognitivist": "predictive",
-                "Orchestrator": "orchestrator",
-            }
-
             col_fire, col_clear = st.columns([1, 1])
             with col_fire:
-                fire_btn = st.button("🔊 Fire query", type="primary")
+                fire_btn = st.button("🔊 Fire query", type="primary", key="voice_fire")
             with col_clear:
-                clear_btn = st.button("✕ Clear")
+                clear_btn = st.button("✕ Clear", key="voice_clear")
 
             if clear_btn:
                 st.session_state.transcription = ''
                 st.session_state.parsed_agent = None
                 st.session_state.parsed_drill_ref = None
-                st.session_state['parsed_query'] = ''
+                st.session_state.parsed_query = ''
                 st.rerun()
 
             if fire_btn:
-                # Resolve agent
                 if manual_agent != "— auto-detected —":
-                    final_agent = recipient_map[manual_agent]
+                    final_agent = RECIPIENT_MAP[manual_agent]
                 elif st.session_state.parsed_agent:
                     final_agent = st.session_state.parsed_agent
                 else:
                     st.error("Please select an agent to address.")
                     st.stop()
 
-                # Use edited transcript if changed
-                query_to_fire = edited_transcript.strip() or st.session_state.get('parsed_query', '').strip()
+                query_to_fire = edited_transcript.strip() or st.session_state.parsed_query.strip()
                 if not query_to_fire:
                     st.error("Query is empty.")
                     st.stop()
 
-                # Prior turn for drill-down
                 prior_text = None
                 if st.session_state.dd_pending:
                     prior_text = st.session_state.dd_pending['text']
@@ -755,33 +730,20 @@ if st.session_state.audio_mode:
                 st.session_state.transcription = ''
                 st.session_state.parsed_agent = None
                 st.session_state.parsed_drill_ref = None
-                st.session_state['parsed_query'] = ''
-                st.session_state.scroll_to_top = True
+                st.session_state.parsed_query = ''
 
                 # Store audio for playback
                 if audio_bytes:
-                    st.session_state['latest_audio'] = audio_bytes
-                    st.session_state['latest_audio_agent'] = final_agent
+                    st.session_state.pending_audio = audio_bytes
+                    st.session_state.pending_audio_agent = final_agent
 
                 st.rerun()
 
     st.markdown('</div>', unsafe_allow_html=True)
-
-    # --- Audio playback ---
-    if st.session_state.get('latest_audio'):
-        _, agent_label = SPEAKER_LABELS.get(
-            st.session_state.get('latest_audio_agent', 'orchestrator'), ('', 'Agent')
-        )
-        st.markdown(f"**🔊 {agent_label} response:**")
-        st.audio(st.session_state['latest_audio'], format="audio/mp3", autoplay=True)
-        if st.button("✕ Dismiss audio"):
-            st.session_state['latest_audio'] = None
-            st.rerun()
-
     st.markdown("---")
 
 # =============================================================================
-# DRILL-DOWN PANEL (text mode and audio mode)
+# DRILL-DOWN PANEL
 # =============================================================================
 
 if st.session_state.dd_pending:
@@ -792,7 +754,7 @@ if st.session_state.dd_pending:
     dd_instruction = st.text_area(
         "Your drill-down instruction:",
         height=100,
-        placeholder="E.g., 'Clarify what you mean by phase transition here' or 'Explain how this relates to the heritability data'",
+        placeholder="E.g., 'Clarify what you mean by phase transition here'",
         key="dd_custom_instruction"
     )
     dd_recipient = st.selectbox(
@@ -803,7 +765,7 @@ if st.session_state.dd_pending:
 
     col_fire, col_cancel = st.columns([1, 1])
     with col_fire:
-        if st.button("🔍 Fire drill-down", type="primary"):
+        if st.button("🔍 Fire drill-down", type="primary", key="dd_fire"):
             if not dd_instruction.strip():
                 st.warning("Please provide an instruction for the drill-down.")
             else:
@@ -812,13 +774,7 @@ if st.session_state.dd_pending:
                     f"has been flagged for follow-up:\n\n\"{pending['text']}\"\n\n"
                     f"Your instruction: {dd_instruction.strip()}"
                 )
-                recipient_map_dd = {
-                    "Orchestrator": "orchestrator",
-                    "Geneticist": "genetics",
-                    "DS Theorist": "systems",
-                    "Predictive Cognitivist": "predictive",
-                }
-                target_spec = recipient_map_dd[dd_recipient]
+                target_spec = RECIPIENT_MAP[dd_recipient]
                 post_to_history(
                     'human',
                     f"[Drill-down to {dd_recipient}] Re: \"{pending['text'][:50]}...\"\n\n{dd_instruction.strip()}"
@@ -834,28 +790,25 @@ if st.session_state.dd_pending:
                 if st.session_state.audio_mode and st.session_state.el_client:
                     with st.spinner(f"Synthesising {label}'s voice…"):
                         audio_bytes = synthesise_speech(response_text, target_spec)
-                        st.write(f"DEBUG: audio_mode={st.session_state.audio_mode}, el_client={st.session_state.el_client is not None}, audio_bytes={audio_bytes is not None}")
 
                 st.session_state.audio_status = 'idle'
                 st.session_state.dd_pending = None
-                st.session_state.scroll_to_top = True
 
                 if audio_bytes:
-                    st.session_state['latest_audio'] = audio_bytes
-                    st.session_state['latest_audio_agent'] = target_spec
-                    st.write(f"DEBUG: audio_bytes length = {len(audio_bytes)}")
+                    st.session_state.pending_audio = audio_bytes
+                    st.session_state.pending_audio_agent = target_spec
 
                 st.rerun()
 
     with col_cancel:
-        if st.button("✕ Cancel"):
+        if st.button("✕ Cancel", key="dd_cancel"):
             st.session_state.dd_pending = None
             st.rerun()
 
     st.markdown("---")
 
 # =============================================================================
-# TEXT INPUT PANEL (available in both modes)
+# TEXT INPUT PANEL
 # =============================================================================
 
 with st.expander("⌨️ Text input", expanded=True):
@@ -897,32 +850,21 @@ with st.expander("⌨️ Text input", expanded=True):
             if pdf_text:
                 full_query = full_query + "\n\n---\nANCHOR PAPER:\n\n" + pdf_text
 
-        recipient_map = {
-            "Orchestrator": "orchestrator",
-            "Geneticist": "genetics",
-            "DS Theorist": "systems",
-            "Predictive Cognitivist": "predictive",
-        }
-        target_spec = recipient_map[recipient]
+            target_spec = RECIPIENT_MAP[recipient]
+            response_text, audio_bytes = fire_query(target_spec, full_query)
+            st.session_state.clear_flag = True
 
-        response_text, audio_bytes = fire_query(target_spec, full_query)
-        st.session_state.clear_flag = True
-        st.session_state['debug_msg'] = f"audio_bytes={audio_bytes is not None}, audio_mode={st.session_state.audio_mode}, el_client={st.session_state.el_client is not None}"
+            if audio_bytes:
+                st.session_state.pending_audio = audio_bytes
+                st.session_state.pending_audio_agent = target_spec
 
-        if audio_bytes:
-            st.session_state['latest_audio'] = audio_bytes
-            st.session_state['latest_audio_agent'] = target_spec
-
-        st.rerun()
-    else:
-        st.warning("Please enter a query first.")
+            st.rerun()
+        else:
+            st.warning("Please enter a query first.")
 
 # =============================================================================
 # TRANSCRIPT
 # =============================================================================
-
-if st.session_state.get('debug_msg'):
-    st.warning(st.session_state['debug_msg'])
 
 st.markdown("---")
 st.markdown("### 💬 Forum Transcript")
@@ -942,9 +884,9 @@ if st.session_state.history:
             unsafe_allow_html=True
         )
 
-        # Drill-down flagging (text mode only; voice mode uses speech reference)
+        # Drill-down flagging (text mode only)
         if item['spec'] in SPECIALIST_SEQUENCE and not st.session_state.audio_mode:
-            flag_key = f"flag_{idx}_{st.session_state.get('flag_counter', 0)}"
+            flag_key = f"flag_{idx}_{st.session_state.flag_counter}"
             flag_text = st.text_input(
                 "Flag passage for drill-down:",
                 key=flag_key,
@@ -957,7 +899,7 @@ if st.session_state.history:
                         'speaker': label,
                         'text': flag_text.strip()
                     })
-                    st.session_state['flag_counter'] = st.session_state.get('flag_counter', 0) + 1
+                    st.session_state.flag_counter += 1
                     st.rerun()
 else:
     st.info("No exchanges yet. Address your first query above.")
