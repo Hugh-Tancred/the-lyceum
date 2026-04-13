@@ -333,16 +333,16 @@ def synthesise_speech(text: str, agent_key: str) -> bytes | None:
         return None
 
     try:
-        audio = st.session_state.el_client.generate(
+        audio = st.session_state.el_client.text_to_speech.convert(
             text=text,
-            voice=voice_id,
+            voice_id=voice_id,
             voice_settings=VoiceSettings(
                 stability=0.55,
                 similarity_boost=0.80,
                 style=0.20,
                 use_speaker_boost=True
             ),
-            model="eleven_multilingual_v2"
+            model_id="eleven_multilingual_v2"
         )
         return b"".join(audio)
     except Exception as e:
@@ -403,6 +403,7 @@ def fire_query(target_spec: str, query_text: str, prior_turn_text: str | None = 
     if st.session_state.audio_mode and st.session_state.el_client:
         with st.spinner(f"Synthesising {label}'s voice…"):
             audio_bytes = synthesise_speech(response_text, target_spec)
+        
 
     return response_text, audio_bytes
 
@@ -425,7 +426,7 @@ with st.sidebar:
         try:
             anthropic_key = st.secrets["ANTHROPIC_API_KEY"]
             st.session_state.llm = ChatAnthropic(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-6",
                 api_key=anthropic_key
             )
         except Exception:
