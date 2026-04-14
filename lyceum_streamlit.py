@@ -559,8 +559,6 @@ if st.session_state.audio_mode:
 
     if not st.session_state.oai_client:
         st.warning("OpenAI API key required for voice input (Whisper transcription).")
-    elif sd is None:
-        st.warning("sounddevice not available — voice recording disabled.")
     else:
         audio_input = st.audio_input("🎙️ Press to record your query")
 
