@@ -19,11 +19,8 @@ import numpy as np
 
 # Audio dependencies
 try:
-    try:
     import sounddevice as sd
 except (ImportError, OSError):
-    sd = None
-except OSError:
     sd = None
 
 import openai
