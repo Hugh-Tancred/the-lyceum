@@ -424,7 +424,7 @@ with st.sidebar:
     # --- API connections ---
     if st.session_state.llm is None:
         try:
-            anthropic_key = st.secrets["ANTHROPIC_API_KEY"]
+            anthropic_key = st.secrets.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
             st.session_state.llm = ChatAnthropic(
                 model="claude-sonnet-4-6",
                 api_key=anthropic_key
@@ -434,14 +434,14 @@ with st.sidebar:
 
     if st.session_state.oai_client is None:
         try:
-            oai_key = st.secrets["OPENAI_API_KEY"]
+            oai_key = st.secrets.get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY")
             st.session_state.oai_client = openai.OpenAI(api_key=oai_key)
         except Exception:
             st.warning("OpenAI key not set — voice input disabled.")
 
     if st.session_state.el_client is None:
         try:
-            el_key = st.secrets["ELEVENLABS_API_KEY"]
+            el_key = st.secrets.get("ELEVENLABS_API_KEY") or os.environ.get("ELEVENLABS_API_KEY")
             st.session_state.el_client = ElevenLabs(api_key=el_key)
         except Exception as e:
             st.warning(f"ElevenLabs not connected: {e}")
