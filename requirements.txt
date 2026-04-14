@@ -4,5 +4,4 @@ langchain-core
 pypdf
 openai
 elevenlabs
-sounddevice
 numpy
