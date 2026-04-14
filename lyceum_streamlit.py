@@ -229,50 +229,25 @@ RECIPIENT_MAP = {
 # AUDIO UTILITIES
 # =============================================================================
 
-def record_audio(duration_seconds: int) -> np.ndarray:
-    """Record audio from the default microphone."""
-    if sd is None:
-        st.error("sounddevice not available — cannot record.")
-        return np.array([])
-    audio = sd.rec(
-        int(duration_seconds * SAMPLE_RATE),
-        samplerate=SAMPLE_RATE,
-        channels=CHANNELS,
-        dtype='float32'
-    )
-    sd.wait()
-    return audio
-
-
-def transcribe_audio(audio_array: np.ndarray) -> str:
-    """Send audio array to OpenAI Whisper API and return transcript."""
+def transcribe_audio(audio_bytes: bytes) -> str:
+    """Send audio bytes to OpenAI Whisper API and return transcript."""
     if st.session_state.oai_client is None:
         return ""
-    if audio_array.size == 0:
+    if not audio_bytes:
         return ""
-
-    import wave
-
-    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
-        tmp_path = tmp.name
-
     try:
-        audio_int16 = (audio_array * 32767).astype(np.int16)
-        with wave.open(tmp_path, 'wb') as wf:
-            wf.setnchannels(CHANNELS)
-            wf.setsampwidth(2)
-            wf.setframerate(SAMPLE_RATE)
-            wf.writeframes(audio_int16.tobytes())
-
-        with open(tmp_path, 'rb') as f:
-            transcript = st.session_state.oai_client.audio.transcriptions.create(
-                model="whisper-1",
-                file=f,
-                language="en"
-            )
+        import io
+        audio_file = io.BytesIO(audio_bytes)
+        audio_file.name = "recording.wav"
+        transcript = st.session_state.oai_client.audio.transcriptions.create(
+            model="whisper-1",
+            file=audio_file,
+            language="en"
+        )
         return transcript.text
-    finally:
-        os.unlink(tmp_path)
+    except Exception as e:
+        st.error(f"Transcription error: {e}")
+        return ""
 
 
 def parse_agent_from_transcript(text: str) -> tuple[str | None, str]:
@@ -587,43 +562,12 @@ if st.session_state.audio_mode:
     elif sd is None:
         st.warning("sounddevice not available — voice recording disabled.")
     else:
-        rec_duration = st.slider(
-            "Recording duration (seconds)",
-            min_value=5,
-            max_value=MAX_RECORD_SECONDS,
-            value=20,
-            step=5,
-            help="Set before pressing Record."
-        )
+        audio_input = st.audio_input("🎙️ Press to record your query")
 
-        col_rec, col_status = st.columns([1, 3])
-        with col_rec:
-            record_btn = st.button(
-                "⏺ Record",
-                type="primary",
-                disabled=st.session_state.recording,
-                help="Press to begin recording."
-            )
-        with col_status:
-            status = st.session_state.audio_status
-            if status == 'recording':
-                st.markdown('<span class="status-listening">● Recording…</span>', unsafe_allow_html=True)
-            elif status in ('transcribing', 'generating'):
-                st.markdown('<span class="status-processing">⏳ Processing…</span>', unsafe_allow_html=True)
-            else:
-                st.markdown('<span class="status-idle">Ready</span>', unsafe_allow_html=True)
-
-        if record_btn:
-            st.session_state.audio_status = 'recording'
-            st.session_state.recording = True
-            with st.spinner(f"Recording for {rec_duration}s — speak now…"):
-                audio_data = record_audio(rec_duration)
-            st.session_state.recorded_audio = audio_data
-            st.session_state.recording = False
+        if audio_input is not None:
             st.session_state.audio_status = 'transcribing'
-
             with st.spinner("Transcribing…"):
-                transcript_text = transcribe_audio(audio_data)
+                transcript_text = transcribe_audio(audio_input.getvalue())
 
             st.session_state.transcription = transcript_text
             st.session_state.audio_status = 'idle'
