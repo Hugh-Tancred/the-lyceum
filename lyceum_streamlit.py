@@ -603,7 +603,6 @@ if st.session_state.audio_mode:
         if st.session_state.transcription:
 
             # --- AUTO-FIRE BLOCK ---
-            # --- AUTO-FIRE BLOCK ---
             if st.session_state.auto_fire_ready:
                 st.session_state.auto_fire_ready = False
                 final_agent = st.session_state.parsed_agent
