@@ -109,6 +109,7 @@ DEFAULTS = {
     'pending_audio_agent': None,  # agent key for labelling
     'auto_fire_ready': False,     # set after transcription to trigger auto-fire
     'auto_fire_at': None,         # timestamp after which auto-fire executes
+    'audio_input_processed': False,  # prevents re-transcription on reruns
 }
 
 for key, default_value in DEFAULTS.items():
@@ -567,7 +568,8 @@ if st.session_state.audio_mode:
     else:
         audio_input = st.audio_input("🎙️ Press to record your query")
 
-        if audio_input is not None and not st.session_state.transcription:
+        if audio_input is not None and not st.session_state.transcription and not st.session_state.get('audio_input_processed', False):
+            st.session_state.audio_input_processed = True
             st.session_state.pending_audio = None
             st.session_state.pending_audio_agent = None
             st.session_state.audio_status = 'transcribing'
@@ -618,6 +620,7 @@ if st.session_state.audio_mode:
                 st.session_state.parsed_agent = None
                 st.session_state.parsed_drill_ref = None
                 st.session_state.parsed_query = ''
+                st.session_state.audio_input_processed = False
                 if audio_bytes:
                     st.session_state.pending_audio = audio_bytes
                     st.session_state.pending_audio_agent = final_agent
