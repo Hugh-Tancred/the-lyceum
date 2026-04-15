@@ -573,34 +573,33 @@ if st.session_state.audio_mode:
             audio_hash = hash(audio_input.getvalue())
             if audio_hash != st.session_state.get('last_audio_hash', None) and not st.session_state.transcription:
                 st.session_state.last_audio_hash = audio_hash
-            st.session_state.pending_audio = None
-            st.session_state.pending_audio_agent = None
-            st.session_state.audio_status = 'transcribing'
-            with st.spinner("Transcribing…"):
-                transcript_text = transcribe_audio(audio_input.getvalue())
+                st.session_state.pending_audio = None
+                st.session_state.pending_audio_agent = None
+                st.session_state.audio_status = 'transcribing'
+                with st.spinner("Transcribing…"):
+                    transcript_text = transcribe_audio(audio_input.getvalue())
 
-            st.session_state.transcription = transcript_text
-            st.session_state.audio_status = 'idle'
+                st.session_state.transcription = transcript_text
+                st.session_state.audio_status = 'idle'
 
-            agent_key, cleaned_query = parse_agent_from_transcript(transcript_text)
-            st.session_state.parsed_agent = agent_key
-            st.session_state.parsed_query = cleaned_query
+                agent_key, cleaned_query = parse_agent_from_transcript(transcript_text)
+                st.session_state.parsed_agent = agent_key
+                st.session_state.parsed_query = cleaned_query
 
-            drill_triggers = ['referring to', 'you said', 'you mentioned', 'what you said',
-                              'that point about', 'earlier comment', 'the passage about',
-                              'drill down on', 'go deeper on', 'follow up on']
-            drill_ref = None
-            for trigger in drill_triggers:
-                if trigger in cleaned_query.lower():
-                    drill_ref = cleaned_query
-                    break
-            st.session_state.parsed_drill_ref = drill_ref
+                drill_triggers = ['referring to', 'you said', 'you mentioned', 'what you said',
+                                  'that point about', 'earlier comment', 'the passage about',
+                                  'drill down on', 'go deeper on', 'follow up on']
+                drill_ref = None
+                for trigger in drill_triggers:
+                    if trigger in cleaned_query.lower():
+                        drill_ref = cleaned_query
+                        break
+                st.session_state.parsed_drill_ref = drill_ref
 
-            # If agent was detected, arm auto-fire; otherwise just rerun to show manual selection
-            if agent_key:
-                st.session_state.auto_fire_ready = True
+                if agent_key:
+                    st.session_state.auto_fire_ready = True
 
-            st.rerun()
+                st.rerun()
 
         # Show transcription and parsed intent
         if st.session_state.transcription:
