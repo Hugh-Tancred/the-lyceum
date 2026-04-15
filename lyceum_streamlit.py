@@ -107,6 +107,7 @@ DEFAULTS = {
     # Audio playback - THE CRITICAL STATE
     'pending_audio': None,        # bytes to play
     'pending_audio_agent': None,  # agent key for labelling
+    'auto_fire_ready': False,     # set after transcription to trigger auto-fire
 }
 
 for key, default_value in DEFAULTS.items():
@@ -261,8 +262,10 @@ def parse_agent_from_transcript(text: str) -> tuple[str | None, str]:
         if match:
             agent_key = AGENT_NAME_MAP[alias]
             cleaned = text[match.end():].strip()
+            st.toast(f"Agent parsed: '{alias}' → {agent_key}", icon="✅")
             return agent_key, cleaned
 
+    st.toast(f"No agent detected. First 40 chars: '{text[:40]}'", icon="⚠️")
     return None, text
 
 
@@ -308,16 +311,17 @@ def synthesise_speech(text: str, agent_key: str) -> bytes | None:
         return None
 
     try:
+        st.toast(f"Synthesising {agent_key} | model: eleven_turbo_v2_5 | chars: {len(text)}", icon="🔊")
         audio = st.session_state.el_client.text_to_speech.convert(
             text=text,
             voice_id=voice_id,
             voice_settings=VoiceSettings(
-                stability=0.55,
-                similarity_boost=0.80,
-                style=0.20,
+                stability=0.42,
+                similarity_boost=0.72,
+                style=0.15,
                 use_speaker_boost=True
             ),
-            model_id="eleven_multilingual_v2"
+            model_id="eleven_turbo_v2_5"
         )
         return b"".join(audio)
     except Exception as e:
@@ -584,10 +588,53 @@ if st.session_state.audio_mode:
                     break
             st.session_state.parsed_drill_ref = drill_ref
 
+            # If agent was detected, arm auto-fire; otherwise just rerun to show manual selection
+            if agent_key:
+                st.session_state.auto_fire_ready = True
+
             st.rerun()
 
         # Show transcription and parsed intent
         if st.session_state.transcription:
+
+            # --- AUTO-FIRE BLOCK ---
+            if st.session_state.auto_fire_ready:
+                agent_names = {
+                    'genetics': 'Geneticist', 'systems': 'DS Theorist',
+                    'predictive': 'Predictive Cognitivist', 'orchestrator': 'Orchestrator',
+                }
+                detected_name = agent_names.get(st.session_state.parsed_agent, 'Unknown')
+                st.info(f"🎙️ Transcribed — addressing **{detected_name}**. Firing in 2 seconds…")
+                st.markdown(f"*"{st.session_state.transcription}"*")
+                if st.button("✕ Cancel auto-fire", key="cancel_autofire"):
+                    st.session_state.auto_fire_ready = False
+                    st.rerun()
+                else:
+                    time.sleep(2)
+                    st.session_state.auto_fire_ready = False
+                    final_agent = st.session_state.parsed_agent
+                    query_to_fire = st.session_state.parsed_query.strip() or st.session_state.transcription.strip()
+                    if not query_to_fire:
+                        st.error("Auto-fire aborted: query is empty after transcription.")
+                        st.session_state.auto_fire_ready = False
+                        st.rerun()
+                    prior_text = None
+                    if st.session_state.dd_pending:
+                        prior_text = st.session_state.dd_pending['text']
+                        st.session_state.dd_pending = None
+                    st.session_state.audio_status = 'generating'
+                    response_text, audio_bytes = fire_query(final_agent, query_to_fire, prior_text)
+                    st.session_state.audio_status = 'idle'
+                    st.session_state.transcription = ''
+                    st.session_state.parsed_agent = None
+                    st.session_state.parsed_drill_ref = None
+                    st.session_state.parsed_query = ''
+                    if audio_bytes:
+                        st.session_state.pending_audio = audio_bytes
+                        st.session_state.pending_audio_agent = final_agent
+                    st.rerun()
+            # --- END AUTO-FIRE BLOCK ---
+
             st.markdown("**Transcription:**")
             edited_transcript = st.text_area(
                 "Transcription (editable):",
