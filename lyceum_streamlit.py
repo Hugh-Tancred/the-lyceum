@@ -607,7 +607,7 @@ if st.session_state.audio_mode:
                 detected_name = agent_names.get(st.session_state.parsed_agent, 'Unknown')
 
                 # Initialise the fire-after timestamp on first entry
-                if 'auto_fire_at' not in st.session_state:
+                if not st.session_state.auto_fire_at:
                     st.session_state.auto_fire_at = time.time() + 2.0
 
                 seconds_left = max(0.0, st.session_state.auto_fire_at - time.time())
