@@ -605,7 +605,7 @@ if st.session_state.audio_mode:
                 }
                 detected_name = agent_names.get(st.session_state.parsed_agent, 'Unknown')
                 st.info(f"🎙️ Transcribed — addressing **{detected_name}**. Firing in 2 seconds…")
-                st.markdown(f"*"{st.session_state.transcription}"*")
+                st.markdown(f'*"{st.session_state.transcription}"*')
                 if st.button("✕ Cancel auto-fire", key="cancel_autofire"):
                     st.session_state.auto_fire_ready = False
                     st.rerun()
