@@ -604,14 +604,30 @@ if st.session_state.audio_mode:
                     'predictive': 'Predictive Cognitivist', 'orchestrator': 'Orchestrator',
                 }
                 detected_name = agent_names.get(st.session_state.parsed_agent, 'Unknown')
-                st.info(f"🎙️ Transcribed — addressing **{detected_name}**. Firing in 2 seconds…")
+
+                # Initialise the fire-after timestamp on first entry
+                if 'auto_fire_at' not in st.session_state:
+                    st.session_state.auto_fire_at = time.time() + 2.0
+
+                seconds_left = max(0.0, st.session_state.auto_fire_at - time.time())
+
+                st.info(f"🎙️ Transcribed — addressing **{detected_name}**. Firing in {seconds_left:.0f} seconds…")
                 st.markdown(f'*"{st.session_state.transcription}"*')
+
                 if st.button("✕ Cancel auto-fire", key="cancel_autofire"):
                     st.session_state.auto_fire_ready = False
+                    st.session_state.pop('auto_fire_at', None)
                     st.rerun()
+
+                elif seconds_left > 0:
+                    # Not ready yet — rerun to update the countdown
+                    time.sleep(0.3)
+                    st.rerun()
+
                 else:
-                    time.sleep(2)
+                    # Time's up — fire
                     st.session_state.auto_fire_ready = False
+                    st.session_state.pop('auto_fire_at', None)
                     final_agent = st.session_state.parsed_agent
                     query_to_fire = st.session_state.parsed_query.strip() or st.session_state.transcription.strip()
                     if not query_to_fire:
