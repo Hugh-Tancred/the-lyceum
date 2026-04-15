@@ -108,6 +108,7 @@ DEFAULTS = {
     'pending_audio': None,        # bytes to play
     'pending_audio_agent': None,  # agent key for labelling
     'auto_fire_ready': False,     # set after transcription to trigger auto-fire
+    'auto_fire_at': None,         # timestamp after which auto-fire executes
 }
 
 for key, default_value in DEFAULTS.items():
