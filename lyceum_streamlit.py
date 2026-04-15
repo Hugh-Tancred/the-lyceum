@@ -549,7 +549,7 @@ if st.session_state.pending_audio is not None:
         st.session_state.pending_audio_agent or 'orchestrator', ('', 'Agent')
     )
     st.markdown(f"### 🔊 {agent_label} is speaking:")
-    st.audio(st.session_state.pending_audio, format="audio/mp3", autoplay=True)
+    st.audio(st.session_state.pending_audio, format="audio/mpeg", autoplay=True)
     if st.button("✕ Dismiss audio", key="dismiss_audio_main"):
         st.session_state.pending_audio = None
         st.session_state.pending_audio_agent = None
