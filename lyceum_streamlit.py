@@ -597,7 +597,7 @@ if st.session_state.audio_mode:
                         break
                 st.session_state.parsed_drill_ref = drill_ref
 
-                if agent_key:
+                if agent_key or st.session_state.last_responding_agent:
                     st.session_state.auto_fire_ready = True
 
                 st.rerun()
