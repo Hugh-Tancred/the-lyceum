@@ -110,6 +110,7 @@ DEFAULTS = {
     'auto_fire_ready': False,     # set after transcription to trigger auto-fire
     'auto_fire_at': None,         # timestamp after which auto-fire executes
     'audio_input_processed': False,  # prevents re-transcription on reruns
+    'last_audio_hash': None,         # prevents re-transcription of same audio on reruns
 }
 
 for key, default_value in DEFAULTS.items():
@@ -568,8 +569,10 @@ if st.session_state.audio_mode:
     else:
         audio_input = st.audio_input("🎙️ Press to record your query")
 
-        if audio_input is not None and not st.session_state.transcription and not st.session_state.get('audio_input_processed', False):
-            st.session_state.audio_input_processed = True
+        if audio_input is not None:
+            audio_hash = hash(audio_input.getvalue())
+            if audio_hash != st.session_state.get('last_audio_hash', None) and not st.session_state.transcription:
+                st.session_state.last_audio_hash = audio_hash
             st.session_state.pending_audio = None
             st.session_state.pending_audio_agent = None
             st.session_state.audio_status = 'transcribing'
