@@ -111,6 +111,7 @@ DEFAULTS = {
     'auto_fire_at': None,         # timestamp after which auto-fire executes
     'audio_input_processed': False,  # prevents re-transcription on reruns
     'last_audio_hash': None,         # prevents re-transcription of same audio on reruns
+    'last_responding_agent': None,   # tracks who spoke last for follow-up routing
 }
 
 for key, default_value in DEFAULTS.items():
@@ -607,7 +608,7 @@ if st.session_state.audio_mode:
             # --- AUTO-FIRE BLOCK ---
             if st.session_state.auto_fire_ready:
                 st.session_state.auto_fire_ready = False
-                final_agent = st.session_state.parsed_agent
+                final_agent = st.session_state.parsed_agent or st.session_state.last_responding_agent
                 query_to_fire = st.session_state.parsed_query.strip() or st.session_state.transcription.strip()
                 if not query_to_fire:
                     st.error("Auto-fire aborted: query is empty after transcription.")
@@ -768,6 +769,7 @@ if st.session_state.dd_pending:
                 with st.spinner(f"{label} is responding…"):
                     response_text = call_agent(target_spec, dd_query)
                 post_to_history(target_spec, response_text)
+                st.session_state.last_responding_agent = target_spec
 
                 audio_bytes = None
                 if st.session_state.audio_mode and st.session_state.el_client:
