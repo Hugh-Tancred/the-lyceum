@@ -567,7 +567,7 @@ if st.session_state.audio_mode:
     else:
         audio_input = st.audio_input("🎙️ Press to record your query")
 
-        if audio_input is not None and not st.session_state.transcription:
+        if audio_input is not None and not st.session_state.transcription and not st.session_state.pending_audio:
             st.session_state.audio_status = 'transcribing'
             with st.spinner("Transcribing…"):
                 transcript_text = transcribe_audio(audio_input.getvalue())
