@@ -599,57 +599,27 @@ if st.session_state.audio_mode:
         if st.session_state.transcription:
 
             # --- AUTO-FIRE BLOCK ---
+            # --- AUTO-FIRE BLOCK ---
             if st.session_state.auto_fire_ready:
-                agent_names = {
-                    'genetics': 'Geneticist', 'systems': 'DS Theorist',
-                    'predictive': 'Predictive Cognitivist', 'orchestrator': 'Orchestrator',
-                }
-                detected_name = agent_names.get(st.session_state.parsed_agent, 'Unknown')
-
-                # Initialise the fire-after timestamp on first entry
-                if not st.session_state.auto_fire_at:
-                    st.session_state.auto_fire_at = time.time() + 2.0
-
-                seconds_left = max(0.0, st.session_state.auto_fire_at - time.time())
-
-                st.info(f"🎙️ Transcribed — addressing **{detected_name}**. Firing in {seconds_left:.0f} seconds…")
-                st.markdown(f'*"{st.session_state.transcription}"*')
-
-                if st.button("✕ Cancel auto-fire", key="cancel_autofire"):
-                    st.session_state.auto_fire_ready = False
-                    st.session_state.pop('auto_fire_at', None)
+                st.session_state.auto_fire_ready = False
+                final_agent = st.session_state.parsed_agent
+                query_to_fire = st.session_state.parsed_query.strip() or st.session_state.transcription.strip()
+                if not query_to_fire:
+                    st.error("Auto-fire aborted: query is empty after transcription.")
                     st.rerun()
-
-                elif seconds_left > 0:
-                    # Not ready yet — rerun to update the countdown
-                    time.sleep(0.3)
-                    st.rerun()
-
-                else:
-                    # Time's up — fire
-                    st.session_state.auto_fire_ready = False
-                    st.session_state.pop('auto_fire_at', None)
-                    final_agent = st.session_state.parsed_agent
-                    query_to_fire = st.session_state.parsed_query.strip() or st.session_state.transcription.strip()
-                    if not query_to_fire:
-                        st.error("Auto-fire aborted: query is empty after transcription.")
-                        st.session_state.auto_fire_ready = False
-                        st.rerun()
-                    prior_text = None
-                    if st.session_state.dd_pending:
-                        prior_text = st.session_state.dd_pending['text']
-                        st.session_state.dd_pending = None
-                    st.session_state.audio_status = 'generating'
-                    response_text, audio_bytes = fire_query(final_agent, query_to_fire, prior_text)
-                    st.session_state.audio_status = 'idle'
-                    st.session_state.transcription = ''
-                    st.session_state.parsed_agent = None
-                    st.session_state.parsed_drill_ref = None
-                    st.session_state.parsed_query = ''
-                    if audio_bytes:
-                        st.session_state.pending_audio = audio_bytes
-                        st.session_state.pending_audio_agent = final_agent
-                    st.rerun()
+                prior_text = None
+                if st.session_state.dd_pending:
+                    prior_text = st.session_state.dd_pending['text']
+                    st.session_state.dd_pending = None
+                response_text, audio_bytes = fire_query(final_agent, query_to_fire, prior_text)
+                st.session_state.transcription = ''
+                st.session_state.parsed_agent = None
+                st.session_state.parsed_drill_ref = None
+                st.session_state.parsed_query = ''
+                if audio_bytes:
+                    st.session_state.pending_audio = audio_bytes
+                    st.session_state.pending_audio_agent = final_agent
+                st.rerun()
             # --- END AUTO-FIRE BLOCK ---
 
             st.markdown("**Transcription:**")
