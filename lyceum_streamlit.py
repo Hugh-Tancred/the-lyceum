@@ -381,6 +381,7 @@ def fire_query(target_spec: str, query_text: str, prior_turn_text: str | None = 
         response_text = call_agent(target_spec, query_text, prior_turn_text)
 
     post_to_history(target_spec, response_text)
+    st.session_state.last_responding_agent = target_spec
 
     audio_bytes = None
     if st.session_state.audio_mode and st.session_state.el_client:
