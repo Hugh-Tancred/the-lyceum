@@ -206,10 +206,10 @@ When the transcript provided to you begins with the instruction DRAFT OUTPUT PAP
 SPECIALIST_SEQUENCE = ['genetics', 'systems', 'predictive']
 
 SPEAKER_LABELS = {
-    'genetics':     ('🧬', 'Geneticist'),
-    'systems':      ('🌊', 'DS Theorist'),
-    'predictive':   ('🧠', 'Predictive Cognitivist'),
-    'orchestrator': ('📋', 'Orchestrator'),
+    'genetics':     ('🧬', 'Robert'),
+    'systems':      ('🌊', 'Linda'),
+    'predictive':   ('🧠', 'Andy'),
+    'orchestrator': ('📋', 'Jackie'),
     'human':        ('👤', 'Forum Chair'),
 }
 
@@ -221,13 +221,17 @@ AGENT_NAME_MAP = {
     'predictive cognitivist': 'predictive', 'predictive': 'predictive',
     'friston': 'predictive', 'cognitivist': 'predictive', 'bayesian': 'predictive',
     'orchestrator': 'orchestrator', 'coordinator': 'orchestrator', 'chair': 'orchestrator',
+    'robert': 'genetics',
+    'linda': 'systems',
+    'andy': 'predictive',
+    'jackie': 'orchestrator',
 }
 
 RECIPIENT_MAP = {
-    "Orchestrator": "orchestrator",
-    "Geneticist": "genetics",
-    "DS Theorist": "systems",
-    "Predictive Cognitivist": "predictive",
+    "Jackie (Orchestrator)": "orchestrator",
+    "Robert (Genetics)": "genetics",
+    "Linda (Dynamic Systems)": "systems",
+    "Andy (Predictive Cognition)": "predictive",
 }
 
 # =============================================================================
@@ -526,7 +530,7 @@ with st.sidebar:
                 "Please write the academic paper as instructed in your paper-writing mode.\n\n"
                 f"{transcript_text}"
             )
-            with st.spinner("Orchestrator is drafting the paper…"):
+            with st.spinner("Jackie is drafting the paper…"):
                 paper_text = call_agent('orchestrator', paper_prompt)
             post_to_history('orchestrator', paper_text)
             st.rerun()
@@ -640,10 +644,10 @@ if st.session_state.audio_mode:
             )
 
             agent_names = {
-                'genetics': 'Geneticist',
-                'systems': 'DS Theorist',
-                'predictive': 'Predictive Cognitivist',
-                'orchestrator': 'Orchestrator',
+                'genetics':     'Robert',
+                'systems':      'Linda',
+                'predictive':   'Andy',
+                'orchestrator': 'Jackie',
             }
             if st.session_state.parsed_agent:
                 detected_name = agent_names.get(st.session_state.parsed_agent, 'Unknown')
@@ -671,7 +675,7 @@ if st.session_state.audio_mode:
 
             manual_agent = st.selectbox(
                 "Address to (override):",
-                ["— auto-detected —", "Geneticist", "DS Theorist", "Predictive Cognitivist", "Orchestrator"],
+                ["— auto-detected —", "Robert (Genetics)", "Linda (Dynamic Systems)", "Andy (Predictive Cognition)", "Jackie (Orchestrator)"],
                 key="manual_agent_select"
             )
 
@@ -744,7 +748,7 @@ if st.session_state.dd_pending:
     )
     dd_recipient = st.selectbox(
         "Address drill-down to:",
-        ["Geneticist", "DS Theorist", "Predictive Cognitivist", "Orchestrator"],
+        ["Robert (Genetics)", "Linda (Dynamic Systems)", "Andy (Predictive Cognition)", "Jackie (Orchestrator)"],
         key="dd_recipient"
     )
 
@@ -801,7 +805,7 @@ with st.expander("⌨️ Text input", expanded=True):
 
     recipient = st.selectbox(
         "Address to:",
-        ["Geneticist", "DS Theorist", "Predictive Cognitivist", "Orchestrator"],
+        ["Robert (Genetics)", "Linda (Dynamic Systems)", "Andy (Predictive Cognition)", "Jackie (Orchestrator)"],
         key="text_recipient"
     )
 
