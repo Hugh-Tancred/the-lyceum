@@ -53,8 +53,8 @@ SIMILARITY_THRESHOLD = 0.35
 
 st.set_page_config(
     page_title="The Novum Lyceum",
-    page_icon="🏛️",
     layout="wide",
+    initial_sidebar_state="collapsed",
     menu_items={
         'Get Help': None,
         'Report a bug': None,
@@ -64,17 +64,30 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-.stApp {background: linear-gradient(to bottom, #E8D5B7, #F5E6D3, #D4A76A, #C19A6B);}
+@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=Inter:wght@300;400;500&display=swap');
+
+.stApp {background: linear-gradient(160deg, #2C3E6B 0%, #3D5A8A 40%, #4A6FA5 100%); min-height: 100vh;}
 [data-testid="stDeployButton"] {display: none !important;}
-.speaker-genetics    {background: #E8F5E9; border-left: 4px solid #4CAF50; padding: 15px; margin: 10px 0; border-radius: 4px;}
-.speaker-systems     {background: #E3F2FD; border-left: 4px solid #2196F3; padding: 15px; margin: 10px 0; border-radius: 4px;}
-.speaker-predictive  {background: #FFF3E0; border-left: 4px solid #FF9800; padding: 15px; margin: 10px 0; border-radius: 4px;}
-.speaker-orchestrator{background: #F3E5F5; border-left: 4px solid #9C27B0; padding: 15px; margin: 10px 0; border-radius: 4px;}
-.speaker-human       {background: #FAFAFA; border-left: 4px solid #607D8B; padding: 15px; margin: 10px 0; border-radius: 4px;}
-.audio-panel         {background: #1a1a2e; border-radius: 8px; padding: 16px; margin: 12px 0; color: #eee;}
-.status-listening    {color: #00ff88; font-weight: bold;}
-.status-processing   {color: #ffaa00; font-weight: bold;}
-.status-idle         {color: #aaaaaa;}
+[data-testid="stSidebar"] {background: #1E2D4F;}
+
+h1 {font-family: 'EB Garamond', serif !important; font-weight: 500 !important; font-size: 2.4rem !important; color: #E8EDF5 !important; letter-spacing: 0.02em !important;}
+h2, h3 {font-family: 'EB Garamond', serif !important; color: #D0D8EC !important;}
+p, div, label, .stMarkdown {font-family: 'Inter', sans-serif !important; font-weight: 300 !important; color: #C8D4E8 !important;}
+
+.speaker-genetics    {background: rgba(255,255,255,0.06); border-left: 3px solid #7EB8C9; padding: 15px; margin: 10px 0; border-radius: 2px;}
+.speaker-systems     {background: rgba(255,255,255,0.06); border-left: 3px solid #9BC4A0; padding: 15px; margin: 10px 0; border-radius: 2px;}
+.speaker-predictive  {background: rgba(255,255,255,0.06); border-left: 3px solid #C4A87E; padding: 15px; margin: 10px 0; border-radius: 2px;}
+.speaker-orchestrator{background: rgba(255,255,255,0.06); border-left: 3px solid #A89BC4; padding: 15px; margin: 10px 0; border-radius: 2px;}
+.speaker-human       {background: rgba(255,255,255,0.03); border-left: 3px solid #7A8FA6; padding: 15px; margin: 10px 0; border-radius: 2px;}
+.audio-panel         {background: rgba(0,0,0,0.2); border-radius: 4px; padding: 16px; margin: 12px 0; color: #C8D4E8;}
+.status-listening    {color: #7EB8C9; font-weight: 500;}
+.status-processing   {color: #C4A87E; font-weight: 500;}
+.status-idle         {color: #7A8FA6;}
+
+.stButton > button {font-family: 'Inter', sans-serif !important; font-weight: 400 !important; font-size: 0.85rem !important; letter-spacing: 0.08em !important; text-transform: uppercase !important; background: transparent !important; border: 1px solid rgba(200,212,232,0.4) !important; color: #C8D4E8 !important; border-radius: 2px !important; padding: 0.4rem 1.2rem !important;}
+.stButton > button:hover {border-color: #C8D4E8 !important; background: rgba(255,255,255,0.08) !important;}
+.stButton > button[kind="primary"] {border-color: #7EB8C9 !important; color: #7EB8C9 !important;}
+.stButton > button[kind="primary"]:hover {background: rgba(126,184,201,0.15) !important;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -206,11 +219,11 @@ When the transcript provided to you begins with the instruction DRAFT OUTPUT PAP
 SPECIALIST_SEQUENCE = ['genetics', 'systems', 'predictive']
 
 SPEAKER_LABELS = {
-    'genetics':     ('🧬', 'Robert'),
-    'systems':      ('🌊', 'Linda'),
-    'predictive':   ('🧠', 'Andy'),
-    'orchestrator': ('📋', 'Jackie'),
-    'human':        ('👤', 'Forum Chair'),
+    'genetics':     ('', 'Robert'),
+    'systems':      ('', 'Linda'),
+    'predictive':   ('', 'Andy'),
+    'orchestrator': ('', 'Jackie'),
+    'human':        ('', 'Forum Chair'),
 }
 
 # Agent name aliases for speech parsing
@@ -400,7 +413,7 @@ def fire_query(target_spec: str, query_text: str, prior_turn_text: str | None = 
 # PAGE HEADER
 # =============================================================================
 
-st.title("🏛️ The Novum Lyceum")
+st.title("The Novum Lyceum")
 st.markdown("*A Platform for Theoretical Framework Integration through Artificial Deliberation*")
 
 # =============================================================================
@@ -447,7 +460,7 @@ with st.sidebar:
 
     # Audio mode toggle
     st.session_state.audio_mode = st.toggle(
-        "🎙️ Audio mode",
+        ``️ Audio mode",
         value=st.session_state.audio_mode,
         help="Enable voice input (Whisper) and spoken agent responses (ElevenLabs)"
     )
@@ -476,7 +489,7 @@ with st.sidebar:
             lines.append(item['text'])
             lines.append("")
         st.download_button(
-            label="📄 Download transcript",
+            label="Download transcript",
             data="\n".join(lines),
             file_name=filename,
             mime="text/plain"
@@ -512,7 +525,7 @@ with st.sidebar:
     st.markdown("---")
 
     # Draft paper
-    if st.button("✍️ Draft output paper", type="primary"):
+    if st.button("Draft output paper", type="primary"):
         if not st.session_state.llm:
             st.warning("Not connected.")
         elif not st.session_state.history:
@@ -573,7 +586,7 @@ if st.session_state.audio_mode:
     if not st.session_state.oai_client:
         st.warning("OpenAI API key required for voice input (Whisper transcription).")
     else:
-        audio_input = st.audio_input("🎙️ Press to record your query")
+        audio_input = st.audio_input(``️ Press to record your query")
 
         if audio_input is not None:
             audio_hash = hash(audio_input.getvalue())
@@ -857,7 +870,7 @@ with st.expander("⌨️ Text input", expanded=True):
 # =============================================================================
 
 st.markdown("---")
-st.markdown("### 💬 Forum Transcript")
+st.markdown("### Forum Transcript")
 st.caption("Most recent exchange shown first. Use Ctrl+F to search.")
 
 if st.session_state.history:
