@@ -581,7 +581,7 @@ if st.session_state.pending_audio is not None:
 
 if st.session_state.audio_mode:
     st.markdown('<div class="audio-panel">', unsafe_allow_html=True)
-    st.markdown("### 🎙️ Voice Input")
+    st.markdown("### Voice Input")
 
     if not st.session_state.oai_client:
         st.warning("OpenAI API key required for voice input (Whisper transcription).")
