@@ -460,7 +460,7 @@ with st.sidebar:
 
     # Audio mode toggle
     st.session_state.audio_mode = st.toggle(
-        Audio mode",
+                "Audio mode",
         value=st.session_state.audio_mode,
         help="Enable voice input (Whisper) and spoken agent responses (ElevenLabs)"
     )
