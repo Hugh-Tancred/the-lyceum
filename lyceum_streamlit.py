@@ -586,7 +586,7 @@ if st.session_state.audio_mode:
     if not st.session_state.oai_client:
         st.warning("OpenAI API key required for voice input (Whisper transcription).")
     else:
-        audio_input = st.audio_input(Press to record your query")
+        audio_input = st.audio_input("Press to record your query")
 
         if audio_input is not None:
             audio_hash = hash(audio_input.getvalue())
