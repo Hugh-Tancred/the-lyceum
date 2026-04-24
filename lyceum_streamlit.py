@@ -429,7 +429,7 @@ with st.sidebar:
         try:
             anthropic_key = os.environ.get("ANTHROPIC_API_KEY") or st.secrets.get("ANTHROPIC_API_KEY", None)
             st.session_state.llm = ChatAnthropic(
-                model="claude-sonnet-4-6",
+                model="claude-opus-4-7",
                 api_key=anthropic_key
             )
         except Exception:
