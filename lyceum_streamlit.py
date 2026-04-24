@@ -396,6 +396,12 @@ def fire_query(target_spec: str, query_text: str, prior_turn_text: str | None = 
     _, label = SPEAKER_LABELS[target_spec]
     post_to_history('human', query_text)
 
+    if prior_turn_text is None:
+        for entry in reversed(st.session_state.history):
+            if entry['spec'] != 'human' and entry['spec'] != target_spec:
+                prior_turn_text = entry['text']
+                break
+
     if target_spec == 'orchestrator':
         with st.spinner(f"{label} is responding…"):
             response_text = call_agent(target_spec, query_text, prior_turn_text)
