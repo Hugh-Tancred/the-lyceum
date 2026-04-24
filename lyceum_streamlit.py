@@ -396,8 +396,33 @@ def fire_query(target_spec: str, query_text: str, prior_turn_text: str | None = 
     _, label = SPEAKER_LABELS[target_spec]
     post_to_history('human', query_text)
 
-    with st.spinner(f"{label} is responding…"):
-        response_text = call_agent(target_spec, query_text, prior_turn_text)
+    if target_spec == 'orchestrator':
+        with st.spinner(f"{label} is responding…"):
+            response_text = call_agent(target_spec, query_text, prior_turn_text)
+    else:
+        full_prompt = PROMPTS.get(target_spec, PROMPTS['orchestrator'])
+        if prior_turn_text:
+            human_content = (
+                f"{query_text}\n\n"
+                f"---\n"
+                f"The specific turn you are being asked to respond to is the following. "
+                f"Engage directly with what is said here — not with a general characterisation "
+                f"of that framework, but with the particular claims, moves, and formulations in this text:\n\n"
+                f"{prior_turn_text}"
+            )
+        else:
+            human_content = query_text
+
+        response_text = ""
+        placeholder = st.empty()
+        for chunk in st.session_state.llm.stream([
+            SystemMessage(content=full_prompt),
+            HumanMessage(content=human_content)
+        ]):
+            if chunk.content:
+                response_text += chunk.content
+                placeholder.markdown(f"**{label}:** {response_text}▌")
+        placeholder.markdown(f"**{label}:** {response_text}")
 
     post_to_history(target_spec, response_text)
     st.session_state.last_responding_agent = target_spec
