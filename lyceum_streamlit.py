@@ -69,6 +69,7 @@ st.markdown("""
 .stApp {background: linear-gradient(160deg, #2C3E6B 0%, #3D5A8A 40%, #4A6FA5 100%); min-height: 100vh;}
 [data-testid="stDeployButton"] {display: none !important;}
 [data-testid="stSidebar"] {background: #1E2D4F;}
+[data-testid="collapsedControl"] {color: #C8D4E8 !important; background: #1E2D4F !important;}
 
 h1 {font-family: 'EB Garamond', serif !important; font-weight: 500 !important; font-size: 2.4rem !important; color: #E8EDF5 !important; letter-spacing: 0.02em !important;}
 h2, h3 {font-family: 'EB Garamond', serif !important; color: #D0D8EC !important;}
