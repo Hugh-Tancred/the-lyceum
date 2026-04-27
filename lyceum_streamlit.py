@@ -7,7 +7,7 @@ Clean rewrite: April 2026
 
 import streamlit as st
 from langchain_anthropic import ChatAnthropic
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from datetime import datetime
 from pypdf import PdfReader
 import io
@@ -221,11 +221,11 @@ When the transcript provided to you begins with the instruction DRAFT OUTPUT PAP
 SPECIALIST_SEQUENCE = ['genetics', 'systems', 'predictive']
 
 SPEAKER_LABELS = {
-    'genetics':     ('', 'Robert'),
-    'systems':      ('', 'Linda'),
-    'predictive':   ('', 'Andy'),
-    'orchestrator': ('', 'Jackie'),
-    'human':        ('', 'Forum Chair'),
+    'genetics':     ('', 'Robert',      'Genetics'),
+    'systems':      ('', 'Linda',       'Dynamic Systems'),
+    'predictive':   ('', 'Andy',        'Predictive Cognition'),
+    'orchestrator': ('', 'Jackie',      ''),
+    'human':        ('', 'Forum Chair', ''),
 }
 
 # Agent name aliases for speech parsing
@@ -356,26 +356,66 @@ def synthesise_speech(text: str, agent_key: str) -> bytes | None:
 # CORE AGENT CALL
 # =============================================================================
 
-def call_agent(spec: str, user_message: str, prior_turn_text: str | None = None) -> str:
-    """Call the specified agent and return the response text."""
-    full_prompt = PROMPTS.get(spec, PROMPTS['orchestrator'])
+def build_messages(
+    target_spec: str,
+    current_query: str,
+    drill_down_passage: str | None = None,
+) -> list:
+    """
+    Construct the full message list for an agent call.
 
-    if prior_turn_text:
-        human_content = (
-            f"{user_message}\n\n"
-            f"---\n"
-            f"The specific turn you are being asked to respond to is the following. "
-            f"Engage directly with what is said here — not with a general characterisation "
-            f"of that framework, but with the particular claims, moves, and formulations in this text:\n\n"
-            f"{prior_turn_text}"
+    The agent receives the running transcript as a sequence of attributed
+    messages, giving it visibility of the whole exchange rather than only
+    the most recent turn. The agent's own prior contributions are AIMessages;
+    everyone else's are HumanMessages with attribution prefixes.
+
+    Jackie's coordination turns are excluded from specialist context (her
+    interventions are meta-discursive and would clutter the deliberation),
+    but when Jackie herself is the target, her own prior turns are included.
+    """
+    full_prompt = PROMPTS.get(target_spec, PROMPTS['orchestrator'])
+    messages = [SystemMessage(content=full_prompt)]
+
+    # Walk the history excluding the most recently posted human turn,
+    # which is the current query and will be appended last with framing.
+    for entry in st.session_state.history[:-1]:
+        spec = entry['spec']
+        text = entry['text']
+
+        if spec == target_spec:
+            messages.append(AIMessage(content=text))
+        elif spec == 'orchestrator' and target_spec != 'orchestrator':
+            # Exclude Jackie's interventions from specialist context
+            continue
+        elif spec == 'human':
+            messages.append(HumanMessage(content=f"[Forum Chair]: {text}"))
+        else:
+            # Another specialist's turn (or Jackie's, when target is Jackie)
+            label_tuple = SPEAKER_LABELS.get(spec, ('', spec.title(), ''))
+            _, name, framework = label_tuple
+            if framework:
+                attribution = f"[{name}, speaking from {framework}]"
+            else:
+                attribution = f"[{name}]"
+            messages.append(HumanMessage(content=f"{attribution}: {text}"))
+
+    # Append the current query as the final HumanMessage.
+    if drill_down_passage:
+        final_content = (
+            f"[Forum Chair, drilling down on an earlier passage]: {current_query}\n\n"
+            f"The passage flagged for drill-down: \"{drill_down_passage}\""
         )
     else:
-        human_content = user_message
+        final_content = f"[Forum Chair]: {current_query}"
 
-    resp = st.session_state.llm.invoke([
-        SystemMessage(content=full_prompt),
-        HumanMessage(content=human_content)
-    ])
+    messages.append(HumanMessage(content=final_content))
+    return messages
+
+
+def call_agent(spec: str, user_message: str, drill_down_passage: str | None = None) -> str:
+    """Call the specified agent (non-streaming) and return the response text."""
+    messages = build_messages(spec, user_message, drill_down_passage)
+    resp = st.session_state.llm.invoke(messages)
     return resp.content
 
 
@@ -388,43 +428,24 @@ def post_to_history(spec: str, text: str):
     })
 
 
-def fire_query(target_spec: str, query_text: str, prior_turn_text: str | None = None) -> tuple[str, bytes | None]:
+def fire_query(target_spec: str, query_text: str, drill_down_passage: str | None = None) -> tuple[str, bytes | None]:
     """
     Unified query firing: call agent, post to history, synthesise audio if in audio mode.
     Returns (response_text, audio_bytes_or_None).
     """
-    _, label = SPEAKER_LABELS[target_spec]
+    _, label, _ = SPEAKER_LABELS[target_spec]
     post_to_history('human', query_text)
 
-    if prior_turn_text is None:
-        for entry in reversed(st.session_state.history):
-            if entry['spec'] != 'human' and entry['spec'] != target_spec:
-                prior_turn_text = entry['text']
-                break
+    messages = build_messages(target_spec, query_text, drill_down_passage)
 
     if target_spec == 'orchestrator':
         with st.spinner(f"{label} is responding…"):
-            response_text = call_agent(target_spec, query_text, prior_turn_text)
+            resp = st.session_state.llm.invoke(messages)
+            response_text = resp.content
     else:
-        full_prompt = PROMPTS.get(target_spec, PROMPTS['orchestrator'])
-        if prior_turn_text:
-            human_content = (
-                f"{query_text}\n\n"
-                f"---\n"
-                f"The specific turn you are being asked to respond to is the following. "
-                f"Engage directly with what is said here — not with a general characterisation "
-                f"of that framework, but with the particular claims, moves, and formulations in this text:\n\n"
-                f"{prior_turn_text}"
-            )
-        else:
-            human_content = query_text
-
         response_text = ""
         placeholder = st.empty()
-        for chunk in st.session_state.llm.stream([
-            SystemMessage(content=full_prompt),
-            HumanMessage(content=human_content)
-        ]):
+        for chunk in st.session_state.llm.stream(messages):
             if chunk.content:
                 response_text += chunk.content
                 placeholder.markdown(f"**{label}:** {response_text}▌")
@@ -437,7 +458,7 @@ def fire_query(target_spec: str, query_text: str, prior_turn_text: str | None = 
     if st.session_state.audio_mode and st.session_state.el_client:
         with st.spinner(f"Synthesising {label}'s voice…"):
             audio_bytes = synthesise_speech(response_text, target_spec)
-        
+
 
     return response_text, audio_bytes
 
@@ -516,7 +537,7 @@ with st.sidebar:
         filename = f"lyceum_transcript_{timestamp}.txt"
         lines = []
         for item in st.session_state.history:
-            _, label = SPEAKER_LABELS.get(item['spec'], ('', item['spec'].title()))
+            _, label, _ = SPEAKER_LABELS.get(item['spec'], ('', item['spec'].title(), ''))
             ts = item.get('timestamp', '')
             lines.append(f"[{label}] [{ts}]")
             lines.append(item['text'])
@@ -566,7 +587,7 @@ with st.sidebar:
         else:
             transcript_lines = []
             for item in st.session_state.history:
-                _, label = SPEAKER_LABELS.get(item['spec'], ('', item['spec'].title()))
+                _, label, _ = SPEAKER_LABELS.get(item['spec'], ('', item['spec'].title(), ''))
                 ts = item.get('timestamp', '')
                 transcript_lines.append(f"[{label}] [{ts}]\n{item['text']}")
             transcript_text = "\n\n---\n\n".join(transcript_lines)
@@ -597,8 +618,8 @@ if not st.session_state.llm:
 # not buried inside conditional blocks that may not execute after st.rerun()
 
 if st.session_state.pending_audio is not None:
-    _, agent_label = SPEAKER_LABELS.get(
-        st.session_state.pending_audio_agent or 'orchestrator', ('', 'Agent')
+    _, agent_label, _ = SPEAKER_LABELS.get(
+        st.session_state.pending_audio_agent or 'orchestrator', ('', 'Agent', '')
     )
     st.markdown(f"### 🔊 {agent_label} is speaking:")
     st.audio(st.session_state.pending_audio, format="audio/mpeg", autoplay=True)
@@ -668,7 +689,7 @@ if st.session_state.audio_mode:
                 if st.session_state.dd_pending:
                     prior_text = st.session_state.dd_pending['text']
                     st.session_state.dd_pending = None
-                response_text, audio_bytes = fire_query(final_agent, query_to_fire, prior_text)
+                response_text, audio_bytes = fire_query(final_agent, query_to_fire, drill_down_passage=prior_text)
                 st.session_state.transcription = ''
                 st.session_state.parsed_agent = None
                 st.session_state.parsed_drill_ref = None
@@ -704,7 +725,7 @@ if st.session_state.audio_mode:
             if st.session_state.parsed_drill_ref:
                 matched_item = find_drill_down_target(st.session_state.parsed_drill_ref)
                 if matched_item:
-                    _, matched_label = SPEAKER_LABELS.get(matched_item['spec'], ('', 'Unknown'))
+                    _, matched_label, _ = SPEAKER_LABELS.get(matched_item['spec'], ('', 'Unknown', ''))
                     preview = matched_item['text'][:100]
                     st.info(f"Drill-down reference matched to {matched_label}: \"{preview}…\"")
                     if st.button("✅ Confirm drill-down match"):
@@ -758,7 +779,7 @@ if st.session_state.audio_mode:
                     st.session_state.dd_pending = None
 
                 st.session_state.audio_status = 'generating'
-                response_text, audio_bytes = fire_query(final_agent, query_to_fire, prior_text)
+                response_text, audio_bytes = fire_query(final_agent, query_to_fire, drill_down_passage=prior_text)
                 st.session_state.audio_status = 'idle'
 
                 # Clear transcription state
@@ -804,11 +825,6 @@ if st.session_state.dd_pending:
             if not dd_instruction.strip():
                 st.warning("Please provide an instruction for the drill-down.")
             else:
-                dd_query = (
-                    f"The following passage from the {pending['speaker']}'s contribution "
-                    f"has been flagged for follow-up:\n\n\"{pending['text']}\"\n\n"
-                    f"Your instruction: {dd_instruction.strip()}"
-                )
                 target_spec = RECIPIENT_MAP[dd_recipient]
                 post_to_history(
                     'human',
@@ -816,9 +832,13 @@ if st.session_state.dd_pending:
                 )
 
                 st.session_state.audio_status = 'generating'
-                _, label = SPEAKER_LABELS[target_spec]
+                _, label, _ = SPEAKER_LABELS[target_spec]
                 with st.spinner(f"{label} is responding…"):
-                    response_text = call_agent(target_spec, dd_query)
+                    response_text = call_agent(
+                        target_spec,
+                        dd_instruction.strip(),
+                        drill_down_passage=pending['text']
+                    )
                 post_to_history(target_spec, response_text)
                 st.session_state.last_responding_agent = target_spec
 
@@ -908,7 +928,7 @@ st.caption("Most recent exchange shown first. Use Ctrl+F to search.")
 
 if st.session_state.history:
     for idx, item in reversed(list(enumerate(st.session_state.history))):
-        icon, label = SPEAKER_LABELS.get(item['spec'], ('❓', item['spec'].title()))
+        icon, label, _ = SPEAKER_LABELS.get(item['spec'], ('❓', item['spec'].title(), ''))
         ts = item.get('timestamp', '')
 
         st.markdown(
