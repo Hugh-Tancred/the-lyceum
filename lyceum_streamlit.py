@@ -671,7 +671,6 @@ with st.sidebar:
 if not st.session_state.llm:
     st.info("Enter API keys in the sidebar to begin.")
     st.stop()
-
 # =============================================================================
 # AUDIO PLAYBACK — RENDERED FIRST, OUTSIDE ALL CONDITIONALS
 # =============================================================================
@@ -858,6 +857,7 @@ if st.session_state.audio_mode:
 
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown("---")
+    
 
 # =============================================================================
 # DRILL-DOWN PANEL
