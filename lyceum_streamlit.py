@@ -396,6 +396,7 @@ def synthesise_speech(text: str, agent_key: str) -> bytes | None:
         return None
 
     try:
+        audio = st.session_state.el_client.text_to_speech.convert(
             text=text,
             voice_id=voice_id,
             voice_settings=VoiceSettings(
