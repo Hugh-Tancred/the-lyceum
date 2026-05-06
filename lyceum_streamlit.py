@@ -523,6 +523,17 @@ def fire_query(target_spec: str, query_text: str, drill_down_passage: str | None
 
     return response_text, audio_bytes
 
+def check_password():
+    if "password_correct" not in st.session_state:
+        st.session_state.password_correct = False
+    if not st.session_state.password_correct:
+        pwd = st.text_input("Password", type="password")
+        if pwd == st.secrets.get("APP_PASSWORD", ""):
+            st.session_state.password_correct = True
+            st.rerun()
+        elif pwd:
+            st.error("Incorrect password")
+        st.stop()
 
 # =============================================================================
 # PAGE HEADER
@@ -530,6 +541,8 @@ def fire_query(target_spec: str, query_text: str, drill_down_passage: str | None
 
 st.title("The Novum Lyceum")
 st.markdown("*A Platform for Theoretical Framework Integration through Artificial Deliberation*")
+
+check_password()
 
 # =============================================================================
 # SIDEBAR
