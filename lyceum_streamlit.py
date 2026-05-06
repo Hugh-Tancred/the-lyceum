@@ -302,7 +302,7 @@ AGENT_NAME_MAP = {
     'orchestrator': 'orchestrator', 'coordinator': 'orchestrator', 'chair': 'orchestrator',
     'robert': 'genetics',
     'linda': 'systems',
-    'Carl': 'predictive',
+    'carl': 'predictive',
     'jackie': 'orchestrator',
 }
 
@@ -349,10 +349,8 @@ def parse_agent_from_transcript(text: str) -> tuple[str | None, str]:
         if match:
             agent_key = AGENT_NAME_MAP[alias]
             cleaned = text[match.end():].strip()
-            st.toast(f"Agent parsed: '{alias}' → {agent_key}", icon="✅")
             return agent_key, cleaned
 
-    st.toast(f"No agent detected. First 40 chars: '{text[:40]}'", icon="⚠️")
     return None, text
 
 
@@ -398,8 +396,6 @@ def synthesise_speech(text: str, agent_key: str) -> bytes | None:
         return None
 
     try:
-        st.toast(f"Synthesising {agent_key} | model: eleven_turbo_v2_5 | chars: {len(text)}", icon="🔊")
-        audio = st.session_state.el_client.text_to_speech.convert(
             text=text,
             voice_id=voice_id,
             voice_settings=VoiceSettings(
