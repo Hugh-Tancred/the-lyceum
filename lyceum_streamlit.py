@@ -37,7 +37,7 @@ ELEVENLABS_VOICE_IDS = {
     "systems":      "a4SZwHT3FMKGrM6vbf60",  # crisp American female
     "predictive":   "abRFZIdN4pvo8ZPmGxHP",  # Australian male
     "orchestrator": "jB2lPb5DhAX6l1TLkKXy",  # British female
-    "annette":     "2EUn20N7uqcXUxqGrJEE",  # Brittney — British female
+    "annette":     "jB2lPb5DhAX6l1TLkKXy",  # Brittney — British female
 }
 
 # Recording settings
