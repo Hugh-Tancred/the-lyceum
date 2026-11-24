@@ -593,7 +593,16 @@ def check_password():
         st.session_state.password_correct = False
     if not st.session_state.password_correct:
         pwd = st.text_input("Password", type="password")
-        if pwd == st.secrets.get("APP_PASSWORD", ""):
+        expected = os.environ.get("APP_PASSWORD")
+        if not expected:
+            try:
+                expected = st.secrets.get("APP_PASSWORD")
+            except st.errors.StreamlitSecretNotFoundError:
+                pass
+        if not expected:
+            st.error("Application password is not configured.")
+            st.stop()
+        if pwd == expected:
             st.session_state.password_correct = True
             st.rerun()
         elif pwd:
